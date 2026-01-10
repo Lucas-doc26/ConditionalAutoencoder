@@ -87,10 +87,10 @@ transform = transforms.Compose([
     )
 ])
 
-for train in ['PUC', 'UFPR04', 'UFPR05', 'camera1', 'camera2', 'camera3', 'camera4', 'camera5', 'camera6', 'camera7','camera8', 'camera9']:
-    train_dataset = CustomImageDataset(csv=f'/CSV/{train}_train.csv', transform=transform, autoencoder=True)
-    val_dataset = CustomImageDataset(csv=f'/CSV/{train}_validation.csv', transform=transform, autoencoder=True)
-    test_dataset = CustomImageDataset(csv=f'/CSV/{train}_test.csv', transform=transform, autoencoder=True)
+for train in ['CNR', 'PKLot']:
+    train_dataset = CustomImageDataset(csv=f'/CSV/{train}/{train}_autoencoder_train.csv', transform=transform, autoencoder=True)
+    val_dataset = CustomImageDataset(csv=f'/CSV/{train}/{train}_autoencoder_validation.csv', transform=transform, autoencoder=True)
+    test_dataset = CustomImageDataset(csv=f'/CSV/{train}/{train}_autoencoder_test.csv', transform=transform, autoencoder=True)
 
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
