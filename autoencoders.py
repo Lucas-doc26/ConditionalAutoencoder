@@ -256,9 +256,9 @@ class Decoder3(nn.Module):
     def __init__(self, latent_dim=1674):
         super().__init__()
 
-        self.fc = nn.Linear(latent_dim, 16 * 16 * 16)
+        self.fc = nn.Linear(latent_dim, 8 * 32 * 32)
 
-        self.conv3 = nn.Conv2d(16, 8, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(32, 8, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(8, 32, kernel_size=3, padding=1)
         self.conv1 = nn.Conv2d(32, 3, kernel_size=3, padding=1)
 
