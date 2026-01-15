@@ -88,9 +88,9 @@ transform = transforms.Compose([
 ])
 
 for train in ['CNR', 'PKLot']:
-    train_dataset = CustomImageDataset(csv=f'/CSV/{train}/{train}_autoencoder_train.csv', transform=transform, autoencoder=True)
-    val_dataset = CustomImageDataset(csv=f'/CSV/{train}/{train}_autoencoder_validation.csv', transform=transform, autoencoder=True)
-    test_dataset = CustomImageDataset(csv=f'/CSV/{train}/{train}_autoencoder_test.csv', transform=transform, autoencoder=True)
+    train_dataset = CustomImageDataset(csv=f'/home/lucas.ocunha/ConditionalAutoencoder/CSV/{train}/{train}_autoencoder_train.csv', transform=transform, autoencoder=True)
+    val_dataset = CustomImageDataset(csv=f'/home/lucas.ocunha/ConditionalAutoencoder/CSV/{train}/{train}_autoencoder_validation.csv', transform=transform, autoencoder=True)
+    test_dataset = CustomImageDataset(csv=f'/home/lucas.ocunha/ConditionalAutoencoder/CSV/{train}/{train}_autoencoder_test.csv', transform=transform, autoencoder=True)
 
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
@@ -106,7 +106,7 @@ for train in ['CNR', 'PKLot']:
         criterion = torch.nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-        num_epochs = 50
+        num_epochs = 500
         train_losses = []
         val_losses = []
         
