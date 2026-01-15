@@ -96,7 +96,7 @@ for train in ['CNR', 'PKLot']:
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-    for model_class in [Autoencoder]:
+    for model_class in [Autoencoder0, Autoencoder1, Autoencoder2]:
         model_name = model_class.__name__
         print(f"\n{'='*70}")
         print(f"Treinando {model_name} com dataset {train}")
@@ -106,7 +106,7 @@ for train in ['CNR', 'PKLot']:
         criterion = torch.nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-        num_epochs = 500
+        num_epochs = 100
         train_losses = []
         val_losses = []
         
