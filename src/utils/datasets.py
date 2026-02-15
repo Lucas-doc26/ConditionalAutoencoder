@@ -23,4 +23,4 @@ class CustomImageDataset(Dataset):
         if self.autoencoder: 
             label = image 
 
-        return image, label
+        return image, label, idx

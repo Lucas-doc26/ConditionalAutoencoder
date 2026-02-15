@@ -30,14 +30,17 @@ def train_experiment_autoencoder(
     
     train_dataset = CustomImageDataset(
         f"/home/lucas.ocunha/ConditionalAutoencoder/CSV/{dataset_name}/{dataset_name}_autoencoder_train.csv",
+        autoencoder=True,
         transform=transform
     )
     val_dataset = CustomImageDataset(
         f"/home/lucas.ocunha/ConditionalAutoencoder/CSV/{dataset_name}/{dataset_name}_autoencoder_validation.csv",
+        autoencoder=True,
         transform=transform
     )
     test_dataset = CustomImageDataset(
         f"/home/lucas.ocunha/ConditionalAutoencoder/CSV/{dataset_name}/{dataset_name}_autoencoder_test.csv",
+        autoencoder=True,
         transform=transform
     )
     
@@ -58,11 +61,18 @@ def train_experiment_autoencoder(
         mlflow.log_param("epochs", num_epochs)
         mlflow.log_param("batch_size", batch_size)
         mlflow.log_param("lr", lr)
-        mlflow.log_param("loss", "MSE")
         mlflow.log_param("input_shape", "3x128x128")
 
         model = model_class().to(device)
-        criterion = nn.MSELoss()
+        if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2, VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5, VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8, VariationalAutoencoder9)):
+            criterion = vae_loss
+            mlflow.log_param("loss", "VAE Loss (BCE + KL)")
+
+        else:
+            criterion = nn.MSELoss()
+            mlflow.log_param("loss", "MSE")
+
+
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
         # -------------------------
@@ -78,11 +88,20 @@ def train_experiment_autoencoder(
 
             model.train()
             train_loss = 0.0
-            for x, y in pbar:
+            total_recon = 0
+            total_kl = 0
+            for x, y, _ in pbar:
                 x, y = x.to(device), y.to(device)
 
-                out = model(x)
-                loss = criterion(out, y)
+                if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2, VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5, VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8, VariationalAutoencoder9)):
+                    x_hat, mu, logvar = model(x)
+                    loss, recon, kl = vae_loss(x_hat, x, mu, logvar)
+                    total_recon += recon.item()
+                    total_kl += kl.item()
+                else:
+                    out = model(x)
+                    loss = criterion(out, y)
+
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -91,6 +110,13 @@ def train_experiment_autoencoder(
                 train_loss += loss.item()
 
             train_loss /= len(train_loader)
+            
+            if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2, VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5, VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8, VariationalAutoencoder9)):
+                recon_avg = total_recon / len(train_loader)
+                kl_avg = total_kl / len(train_loader)
+
+                mlflow.log_metric("recon", recon_avg, step=epoch)
+                mlflow.log_metric("kl", kl_avg, step=epoch)
 
             model.eval()
             val_loss = 0.0
@@ -109,7 +135,7 @@ def train_experiment_autoencoder(
         # -------------------------
         model.eval()
         with torch.no_grad():
-            for x, _ in test_loader:
+            for x, _, _ in test_loader:
                 x = x[:8].to(device)
                 recon = model(x)
                 break
@@ -130,7 +156,7 @@ def train_experiment_autoencoder(
         }
 
         with torch.no_grad():
-            for i, (images, _) in enumerate(test_loader):
+            for i, (images, _, _) in enumerate(test_loader):
 
                 if i >= 2:
                     break
@@ -203,7 +229,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", type=int, default=10, help="Número de épocas para treinamento")
-    parser.add_argument("-v", "--models", type=str, default="all", help="Usar todos os autoencoders")    
+    parser.add_argument("-m", "--models", type=str, default="all", help="Usar todos os autoencoders")    
 
     
     args = parser.parse_args()
@@ -226,7 +252,7 @@ if __name__ == "__main__":
             VariationalAutoencoder9
         ]
 
-    elif args.models == "variational":
+    elif args.models == "vae":
         encoders = [
             VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2,
             VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5,

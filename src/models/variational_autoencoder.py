@@ -2,13 +2,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-def vae_loss(x_hat, x, mu, logvar):
-    recon = F.mse_loss(x_hat, x, reduction="sum")
-    kl = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    return recon + kl
+def vae_loss(x_hat, x, mu, logvar, beta=1.0):
+    recon = F.mse_loss(x_hat, x, reduction="mean")
+
+    kl = -0.5 * torch.mean(
+        1 + logvar - mu.pow(2) - logvar.exp()
+    )
+
+    loss = recon + beta * kl
+
+    return loss, recon.detach(), kl.detach()
 
 
-class VariationalVariationalEncoder0(nn.Module):
+class VariationalEncoder0(nn.Module):
     def __init__(self, latent_dim=1849):
         super().__init__()
 
@@ -42,7 +48,7 @@ class VariationalVariationalEncoder0(nn.Module):
         return mu, logvar
 
 
-class VariationalVariationalDecoder0(nn.Module):
+class VariationalDecoder0(nn.Module):
     def __init__(self, latent_dim=1849):
         super().__init__()
 
@@ -70,12 +76,12 @@ class VariationalVariationalDecoder0(nn.Module):
 
         return x
     
-class VariationalVariationalAutoencoder0(nn.Module):
+class VariationalAutoencoder0(nn.Module):
     def __init__(self, latent_dim=1849):
         super().__init__()
 
-        self.encoder = VariationalVariationalEncoder0(latent_dim)
-        self.decoder = VariationalVariationalDecoder0(latent_dim)
+        self.encoder = VariationalEncoder0(latent_dim)
+        self.decoder = VariationalDecoder0(latent_dim)
 
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)

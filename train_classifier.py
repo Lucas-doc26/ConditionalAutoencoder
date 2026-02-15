@@ -1,4 +1,9 @@
 import os
+
+import matplotlib
+matplotlib.use("Agg")
+
+
 import re
 import argparse
 import numpy as np
@@ -19,6 +24,9 @@ from src.utils.datasets import CustomImageDataset
 from src.utils.transform import return_transform
 from src.models import *
 from src.utils.plot import log_confusion_matrix_mlflow
+
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
 
 
 # Utils
@@ -149,8 +157,6 @@ def train_classifier(
 
         model_name = f"{model_encoder.__name__}_Classifier"
         
-        mlflow.enable_system_metrics_logging()
-
         # -----------------------------
         # Cache test loaders
         # -----------------------------
@@ -184,17 +190,16 @@ def train_classifier(
             criterion = nn.CrossEntropyLoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-            # -----------------------------
             # Train
-            # -----------------------------
             for epoch in tqdm(
                 range(num_epochs),
                 desc=f"[GPU {gpu_id}] Epochs",
+                position=gpu_id
             ):
                 model.train()
                 train_loss, train_correct, train_total = 0, 0, 0
 
-                for x, y in train_loader:
+                for x, y, _ in train_loader:
                     x = x.to(device, non_blocking=True)
                     y = y.to(device, non_blocking=True)
 
@@ -219,7 +224,7 @@ def train_classifier(
                 val_loss, val_correct, val_total = 0, 0, 0
 
                 with torch.no_grad():
-                    for x, y in val_loader:
+                    for x, y, _ in val_loader:
                         x = x.to(device, non_blocking=True)
                         y = y.to(device, non_blocking=True)
 
@@ -238,9 +243,7 @@ def train_classifier(
                 mlflow.log_metric("val_loss", val_loss, step=epoch)
                 mlflow.log_metric("val_acc", val_acc, step=epoch)
 
-            # ====================================================
             # TEST (offline style)
-            # ====================================================
             test_results = {}
 
             for name, loader in test_loaders.items():
@@ -249,24 +252,19 @@ def train_classifier(
 
                 model.eval()
                 with torch.no_grad():
-                    for batch_idx, (x, y) in enumerate(tqdm(loader,  desc=f"[GPU {gpu_id}] Testing on {name}")):
+                    for x, y, idx in tqdm(loader,  desc=f"[GPU {gpu_id}] Testing on {name}", position=gpu_id):
                         x = x.to(device, non_blocking=True)
                         y = y.to(device, non_blocking=True)
 
                         out = model(x)
-                        preds = out.argmax(1)
+                        preds = out.argmax(1)   
 
                         y_true.extend(y.cpu().numpy())
                         y_pred.extend(preds.cpu().numpy())
-                        all_logits.append(out.cpu().numpy())
-
-                        all_ids.extend(
-                            loader.dataset.df.iloc[
-                                batch_idx * loader.batch_size:
-                                batch_idx * loader.batch_size + x.size(0),
-                                0
-                            ].values
-                        )
+                        probs = torch.softmax(out, dim=1)
+                        all_logits.append(probs.cpu().numpy().astype(np.float16))
+                        all_ids.extend(idx.cpu().numpy())
+                
 
                 test_results[name] = {
                     "acc": accuracy_score(y_true, y_pred),
@@ -278,9 +276,10 @@ def train_classifier(
                     "ids": np.array(all_ids),
                 }
 
-            # -----------------------------
+                del y_true, y_pred, all_logits, all_ids
+                torch.cuda.empty_cache()
+                
             # Log results
-            # -----------------------------
             for name, r in test_results.items():
                 mlflow.log_metric(f"test_acc-{name}", r["acc"])
                 mlflow.log_metric(f"test_precision-{name}", r["precision"])
@@ -298,10 +297,13 @@ def train_classifier(
                     f"{batch_size_csv}/preds/{name}"
                 )
                 os.makedirs(save_dir, exist_ok=True)
-                np.save(f"{save_dir}/logits.npy", r["logits"])
-                np.save(f"{save_dir}/ids.npy", r["ids"])
+                np.savez_compressed(
+                        f"{save_dir}/outputs.npz",
+                        probs=r["logits"],          # já float16
+                        ids=r["ids"]
+                    )
 
-            mlflow.pytorch.log_model(model, "classifier")
+            #mlflow.pytorch.log_model(model, "classifier")
 
             """os.makedirs(
                 f"models/{model_name}_{dataset_classifier_name}/"
@@ -313,6 +315,8 @@ def train_classifier(
                 f"models/{model_name}_{dataset_classifier_name}/"
                 f"{batch_size_csv}/weights/classifier.pth"
             )"""
+
+            mlflow.end_run()
 
 
 def worker(rank, jobs_by_gpu):
@@ -346,7 +350,6 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs", type=int, default=10)
     args = parser.parse_args()
 
-    # ===== MODELOS SEPARADOS =====
     ENCODERS = [
         Encoder0, Encoder1, Encoder2, Encoder3, Encoder4,
         Encoder5, Encoder6, Encoder7, Encoder8, Encoder9

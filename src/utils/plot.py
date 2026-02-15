@@ -1,7 +1,9 @@
-import torch
 import os
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("Agg")
 
+import torch
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
