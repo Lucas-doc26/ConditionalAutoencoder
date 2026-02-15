@@ -203,21 +203,46 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", type=int, default=10, help="Número de épocas para treinamento")
+    parser.add_argument("-v", "--models", type=str, default="all", help="Usar todos os autoencoders")    
+
     
     args = parser.parse_args()
     
     epochs = args.epochs
 
-    encoders = [
-        Autoencoder0, Autoencoder1, Autoencoder2,
-        Autoencoder3, Autoencoder4, Autoencoder5,
-        Autoencoder6, Autoencoder7, Autoencoder8,
-        Autoencoder9,
-        SkipAutoencoder0, SkipAutoencoder1, SkipAutoencoder2,
-        SkipAutoencoder3, SkipAutoencoder4, SkipAutoencoder5,
-        SkipAutoencoder6, SkipAutoencoder7, SkipAutoencoder8,
-        SkipAutoencoder9
-    ]
+    if args.models == "all":
+        encoders = [
+            Autoencoder0, Autoencoder1, Autoencoder2,
+            Autoencoder3, Autoencoder4, Autoencoder5,
+            Autoencoder6, Autoencoder7, Autoencoder8,
+            Autoencoder9,
+            SkipAutoencoder0, SkipAutoencoder1, SkipAutoencoder2,
+            SkipAutoencoder3, SkipAutoencoder4, SkipAutoencoder5,
+            SkipAutoencoder6, SkipAutoencoder7, SkipAutoencoder8,
+            SkipAutoencoder9,
+            VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2,
+            VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5,
+            VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8,
+            VariationalAutoencoder9
+        ]
+
+    elif args.models == "variational":
+        encoders = [
+            VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2,
+            VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5,
+            VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8,
+            VariationalAutoencoder9
+        ]
+    elif args.models == "skip":
+        encoders = [
+            SkipAutoencoder0, SkipAutoencoder1, SkipAutoencoder2,
+            SkipAutoencoder3, SkipAutoencoder4, SkipAutoencoder5,
+            SkipAutoencoder6, SkipAutoencoder7, SkipAutoencoder8,
+            SkipAutoencoder9
+        ]
+    else:
+        encoders = [model for model in globals().values() if isinstance(model, type) and issubclass(model, Autoencoder) and model != Autoencoder]
+        raise ValueError(f"Modelo inválido: {args.models}")
 
     jobs = []
     n_procs = len(Config.DEVICES)
