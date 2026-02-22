@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 from src.config.config import Config
 
-LATENT_DIMS = Config.LATENT_DIMS
+LATENT_DIMS = Config().LATENT_DIMS
 
 class Encoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):

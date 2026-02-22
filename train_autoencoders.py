@@ -15,7 +15,7 @@ from src.models import *
 from src.utils.image_metrics import calculate_all_metrics_torch
 
 
-NUM_WORKS = 4
+NUM_WORKS = 8
 PERSISTENT_WORKERS = True
 PIN_MEMORY = True
 
@@ -28,7 +28,7 @@ def train_experiment_autoencoder(
     num_epochs=10,
     lr=1e-3
 ):
-    device = Config.DEVICES[gpu_id]
+    device = Config().DEVICES[gpu_id]
     torch.cuda.set_device(device)
 
     
@@ -68,9 +68,8 @@ def train_experiment_autoencoder(
         mlflow.log_param("batch_size", batch_size)
         mlflow.log_param("lr", lr)
         mlflow.log_param("input_shape", "3x128x128")
-        mlflow.log_param("latent_dim", )
 
-        model = model_class(latent_dim=mlflow.active_run().get_param("latent_dim")).to(device)
+        model = model_class().to(device)
         if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2, VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5, VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8, VariationalAutoencoder9)):
             criterion = vae_loss
             mlflow.log_param("loss", "VAE Loss (BCE + KL)")
@@ -78,6 +77,7 @@ def train_experiment_autoencoder(
         else:
             criterion = nn.MSELoss()
             mlflow.log_param("loss", "MSE")
+        mlflow.log_param("latent_dim", model.latent_dim)
 
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -224,12 +224,12 @@ def train_experiment_autoencoder(
         torch.save(model.decoder.state_dict(), f"models/{model_name}/{dataset_name}/decoder.pth")
 
 def worker(rank, jobs_split):
-    NUM_GPUS = len(Config.DEVICES)
+    NUM_GPUS = len(Config().DEVICES)
     gpu_id = rank % NUM_GPUS
 
     torch.cuda.set_device(gpu_id)
 
-    mlflow.set_tracking_uri(Config.IP_LOCAL)
+    mlflow.set_tracking_uri(Config().IP_LOCAL)
 
     my_jobs = jobs_split[rank]
 
@@ -292,7 +292,7 @@ if __name__ == "__main__":
         raise ValueError(f"Modelo inválido: {args.models}")
 
     jobs = []
-    n_procs = len(Config.DEVICES)
+    n_procs = len(Config().DEVICES)
 
     for dataset_encoder in ["CNR", "PKLot"]:
         for model in encoders:
@@ -300,13 +300,13 @@ if __name__ == "__main__":
             
     jobs.sort(key=lambda x: x[0].__name__)
 
-    NUM_GPUS = len(Config.DEVICES)     # ex: 2
+    NUM_GPUS = len(Config().DEVICES)     # ex: 2
     PROCS_PER_GPU = 1                # ~3GB por processo
 
     n_procs = NUM_GPUS * PROCS_PER_GPU
     n_procs = min(n_procs, len(jobs))
 
-    jobs_split = split_jobs(jobs, 1)
+    jobs_split = split_jobs(jobs, n_procs)
 
     print(f"Total de jobs: {len(jobs)}")
     print(f"Processos: {n_procs}")

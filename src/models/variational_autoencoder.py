@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch
 from src.config.config import Config
 
-LATENT_DIMS = Config.LATENT_DIMS
+LATENT_DIMS = Config().LATENT_DIMS
 
 
 def vae_loss(x_hat, x, mu, logvar, beta=1.0):
@@ -87,7 +87,7 @@ class VariationalDecoder0(nn.Module):
 class VariationalAutoencoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
-
+        self.latent_dim = latent_dim
         self.encoder = VariationalEncoder0(latent_dim)
         self.decoder = VariationalDecoder0(latent_dim)
 
