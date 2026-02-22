@@ -49,6 +49,7 @@ def train_experiment_autoencoder(
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, persistent_workers=False)
     
     model_name = model_class.__name__
+    latent_dim = random.randint(256, 512)
     mlflow.set_experiment(model_name)
 
     with mlflow.start_run(run_name=f"{model_name}_{dataset_name}"):
@@ -62,8 +63,9 @@ def train_experiment_autoencoder(
         mlflow.log_param("batch_size", batch_size)
         mlflow.log_param("lr", lr)
         mlflow.log_param("input_shape", "3x128x128")
+        mlflow.log_param("latent_dim", )
 
-        model = model_class().to(device)
+        model = model_class(latent_dim=mlflow.active_run().get_param("latent_dim")).to(device)
         if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2, VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5, VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8, VariationalAutoencoder9)):
             criterion = vae_loss
             mlflow.log_param("loss", "VAE Loss (BCE + KL)")
@@ -121,9 +123,14 @@ def train_experiment_autoencoder(
             model.eval()
             val_loss = 0.0
             with torch.no_grad():
-                for x, y in val_loader:
+                for x, y, _ in val_loader:
                     x, y = x.to(device), y.to(device)
-                    val_loss += criterion(model(x), y).item()
+                    if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1, VariationalAutoencoder2, VariationalAutoencoder3, VariationalAutoencoder4, VariationalAutoencoder5, VariationalAutoencoder6, VariationalAutoencoder7, VariationalAutoencoder8, VariationalAutoencoder9)):
+                        x_hat, mu, logvar = model(x)
+                        loss, _, _ = vae_loss(x_hat, x, mu, logvar)
+                    else:
+                        out = model(x)
+                        loss = criterion(out, y)
 
             val_loss /= len(val_loader)
 
@@ -164,8 +171,19 @@ def train_experiment_autoencoder(
                 images = images.to(device)
                 outputs = model(images)
 
-                images_dn = torch.clamp(denormalize(images), 0, 1)
-                outputs_dn = torch.clamp(denormalize(outputs), 0, 1)
+                if isinstance(model, (VariationalAutoencoder0, VariationalAutoencoder1,
+                      VariationalAutoencoder2, VariationalAutoencoder3,
+                      VariationalAutoencoder4, VariationalAutoencoder5,
+                      VariationalAutoencoder6, VariationalAutoencoder7,
+                      VariationalAutoencoder8, VariationalAutoencoder9)):
+                    outputs = outputs[0]
+                outputs = outputs.to(device)
+
+                images_cpu = images.detach().cpu()
+                outputs_cpu = outputs.detach().cpu()
+
+                images_dn = torch.clamp(denormalize(images_cpu), 0, 1)
+                outputs_dn = torch.clamp(denormalize(outputs_cpu), 0, 1)
 
                 batch_metrics = calculate_all_metrics_torch(
                     images_dn, outputs_dn
@@ -230,7 +248,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epochs", type=int, default=10, help="Número de épocas para treinamento")
     parser.add_argument("-m", "--models", type=str, default="all", help="Usar todos os autoencoders")    
-
     
     args = parser.parse_args()
     

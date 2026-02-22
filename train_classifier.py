@@ -293,7 +293,7 @@ def train_classifier(
                 )
 
                 save_dir = (
-                    f"models/{model_name}_{dataset_classifier_name}/"
+                    f"models/{model_name}_{dataset_classifier_name}/encoder_{dataset_encoder_name}/"
                     f"{batch_size_csv}/preds/{name}"
                 )
                 os.makedirs(save_dir, exist_ok=True)
@@ -361,6 +361,11 @@ if __name__ == "__main__":
         SkipEncoder8, SkipEncoder9
     ]
 
+    VAE_ENCODERS = [
+        VariationalEncoder0, VariationalEncoder1, VariationalEncoder2, VariationalEncoder3, VariationalEncoder4,
+        VariationalEncoder5, VariationalEncoder6, VariationalEncoder7, VariationalEncoder8, VariationalEncoder9
+    ]
+
     datasets_encoder = ["CNR", "PKLot"]
     datasets_classifier = [
         "PUC", "UFPR04", "UFPR05",
@@ -376,16 +381,29 @@ if __name__ == "__main__":
         for cls_ds in datasets_classifier
     ]
 
+    vae_encoder_jobs = [
+        (model, enc_ds, cls_ds, args.epochs)
+        for enc_ds in datasets_encoder
+        for model in VAE_ENCODERS
+        for cls_ds in datasets_classifier
+    ]
+
     skip_encoder_jobs = [
         (model, enc_ds, cls_ds, args.epochs)
         for enc_ds in datasets_encoder
         for model in SKIP_ENCODERS
         for cls_ds in datasets_classifier
     ]
+    import math
+
+    half = math.ceil(len(vae_encoder_jobs) / 2)
+
+    vae_gpu0 = vae_encoder_jobs[:half]
+    vae_gpu1 = vae_encoder_jobs[half:]
 
     jobs_by_gpu = {
-        0: encoder_jobs,        # GPU 0 → Encoders
-        1: skip_encoder_jobs    # GPU 1 → SkipEncoders
+        0: encoder_jobs + vae_gpu0,
+        1: skip_encoder_jobs + vae_gpu1,
     }
 
     assert len(Config.DEVICES) >= 2, "Você precisa de pelo menos 2 GPUs"
