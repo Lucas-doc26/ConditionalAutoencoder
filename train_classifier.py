@@ -25,8 +25,12 @@ from src.utils.transform import return_transform
 from src.models import *
 from src.utils.plot import log_confusion_matrix_mlflow
 
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.deterministic = False
+
+NUM_WORKS = 4
+PIN_MEMORY = True
+PERSISTENT_WORKERS = True
 
 
 # Utils
@@ -40,10 +44,10 @@ def make_test_loader(csv_path, transform, batch_size, pin_memory):
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=0,
-        pin_memory=pin_memory,
+        num_workers=NUM_WORKS,
+        pin_memory=PIN_MEMORY,
         prefetch_factor=None,
-        persistent_workers=False
+        persistent_workers=PERSISTENT_WORKERS
     )
 
 
@@ -185,12 +189,12 @@ def train_classifier(
             mlflow.log_param("loss", "CrossEntropy")
             mlflow.log_param("input_shape", "3x128x128")
             mlflow.log_input(train_dataset_mlflow, context="training")
-
-
+         
+            # Train
             criterion = nn.CrossEntropyLoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            scaler = torch.cuda.amp.GradScaler()
 
-            # Train
             for epoch in tqdm(
                 range(num_epochs),
                 desc=f"[GPU {gpu_id}] Epochs",
@@ -203,12 +207,15 @@ def train_classifier(
                     x = x.to(device, non_blocking=True)
                     y = y.to(device, non_blocking=True)
 
-                    out = model(x)
-                    loss = criterion(out, y)
-
                     optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
+
+                    with torch.cuda.amp.autocast():
+                        out = model(x)
+                        loss = criterion(out, y)
+
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
 
                     train_loss += loss.item()
                     train_correct += (out.argmax(1) == y).sum().item()
@@ -228,8 +235,9 @@ def train_classifier(
                         x = x.to(device, non_blocking=True)
                         y = y.to(device, non_blocking=True)
 
-                        out = model(x)
-                        loss = criterion(out, y)
+                        with torch.cuda.amp.autocast():
+                            out = model(x)
+                            loss = criterion(out, y)
 
                         val_loss += loss.item()
                         val_correct += (out.argmax(1) == y).sum().item()
@@ -245,26 +253,34 @@ def train_classifier(
 
             # TEST (offline style)
             test_results = {}
+            model.eval()
 
             for name, loader in test_loaders.items():
                 y_true, y_pred = [], []
                 all_logits, all_ids = [], []
 
-                model.eval()
                 with torch.no_grad():
-                    for x, y, idx in tqdm(loader,  desc=f"[GPU {gpu_id}] Testing on {name}", position=gpu_id):
+                    for x, y, idx in tqdm(
+                        loader,
+                        desc=f"[GPU {gpu_id}] Testing on {name}",
+                        position=gpu_id
+                    ):
                         x = x.to(device, non_blocking=True)
                         y = y.to(device, non_blocking=True)
 
-                        out = model(x)
-                        preds = out.argmax(1)   
+                        with torch.cuda.amp.autocast():
+                            out = model(x)
+
+                        preds = out.argmax(1)
 
                         y_true.extend(y.cpu().numpy())
                         y_pred.extend(preds.cpu().numpy())
+
                         probs = torch.softmax(out, dim=1)
-                        all_logits.append(probs.cpu().numpy().astype(np.float16))
+                        all_logits.append(
+                            probs.detach().cpu().numpy().astype(np.float16)
+                        )
                         all_ids.extend(idx.cpu().numpy())
-                
 
                 test_results[name] = {
                     "acc": accuracy_score(y_true, y_pred),
@@ -278,7 +294,7 @@ def train_classifier(
 
                 del y_true, y_pred, all_logits, all_ids
                 torch.cuda.empty_cache()
-                
+                            
             # Log results
             for name, r in test_results.items():
                 mlflow.log_metric(f"test_acc-{name}", r["acc"])
@@ -293,7 +309,7 @@ def train_classifier(
                 )
 
                 save_dir = (
-                    f"models/{model_name}_{dataset_classifier_name}/encoder_{dataset_encoder_name}/"
+                    f"models/{model_name}/{dataset_classifier_name}/encoder_{dataset_encoder_name}/"
                     f"{batch_size_csv}/preds/{name}"
                 )
                 os.makedirs(save_dir, exist_ok=True)

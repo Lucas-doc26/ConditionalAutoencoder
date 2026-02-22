@@ -14,6 +14,12 @@ from src.utils.transform import return_transform
 from src.models import *
 from src.utils.image_metrics import calculate_all_metrics_torch
 
+
+NUM_WORKS = 4
+PERSISTENT_WORKERS = True
+PIN_MEMORY = True
+
+
 def train_experiment_autoencoder(
     gpu_id=0, 
     model_class=None, 
@@ -44,12 +50,11 @@ def train_experiment_autoencoder(
         transform=transform
     )
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, persistent_workers=False)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, persistent_workers=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, persistent_workers=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=NUM_WORKS, pin_memory=PIN_MEMORY, persistent_workers=PERSISTENT_WORKERS)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=NUM_WORKS, pin_memory=PIN_MEMORY, persistent_workers=PERSISTENT_WORKERS)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=NUM_WORKS, pin_memory=PIN_MEMORY, persistent_workers=PERSISTENT_WORKERS)
     
     model_name = model_class.__name__
-    latent_dim = random.randint(256, 512)
     mlflow.set_experiment(model_name)
 
     with mlflow.start_run(run_name=f"{model_name}_{dataset_name}"):
@@ -212,12 +217,11 @@ def train_experiment_autoencoder(
 
         print(f"✓ {model_name} | {dataset_name} finalizado")
 
-        os.makedirs(f"models/{model_name}_{dataset_name}", exist_ok=True)
+        os.makedirs(f"models/{model_name}/{dataset_name}", exist_ok=True)
 
-        torch.save(model.state_dict(), f"models/{model_name}_{dataset_name}/autoencoder.pth")
-        torch.save(model.encoder.state_dict(), f"models/{model_name}_{dataset_name}/encoder.pth")
-        torch.save(model.decoder.state_dict(), f"models/{model_name}_{dataset_name}/decoder.pth")
-
+        torch.save(model.state_dict(), f"models/{model_name}/{dataset_name}/autoencoder.pth")
+        torch.save(model.encoder.state_dict(), f"models/{model_name}/{dataset_name}/encoder.pth")
+        torch.save(model.decoder.state_dict(), f"models/{model_name}/{dataset_name}/decoder.pth")
 
 def worker(rank, jobs_split):
     NUM_GPUS = len(Config.DEVICES)
@@ -297,12 +301,12 @@ if __name__ == "__main__":
     jobs.sort(key=lambda x: x[0].__name__)
 
     NUM_GPUS = len(Config.DEVICES)     # ex: 2
-    PROCS_PER_GPU = 5                 # ~3GB por processo
+    PROCS_PER_GPU = 1                # ~3GB por processo
 
     n_procs = NUM_GPUS * PROCS_PER_GPU
     n_procs = min(n_procs, len(jobs))
 
-    jobs_split = split_jobs(jobs, n_procs)
+    jobs_split = split_jobs(jobs, 1)
 
     print(f"Total de jobs: {len(jobs)}")
     print(f"Processos: {n_procs}")

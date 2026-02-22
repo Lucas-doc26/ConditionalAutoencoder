@@ -1,6 +1,10 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+from src.config.config import Config
+
+LATENT_DIMS = Config.LATENT_DIMS
+
 
 def vae_loss(x_hat, x, mu, logvar, beta=1.0):
     recon = F.mse_loss(x_hat, x, reduction="mean")
@@ -14,8 +18,12 @@ def vae_loss(x_hat, x, mu, logvar, beta=1.0):
     return loss, recon.detach(), kl.detach()
 
 
+#Latent dims: 1849, 467, 1411, 1674, 562, 685, 1262, 1960, 838, 1417
+#Estavam muito grandes, por isso troquei tudo por valores aleatórios entre 256 e 512, para ver se melhora a qualidade das imagens reconstruídas.
+
+
 class VariationalEncoder0(nn.Module):
-    def __init__(self, latent_dim=1849):
+    def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
 
         self.latent_dim = latent_dim
@@ -49,7 +57,7 @@ class VariationalEncoder0(nn.Module):
 
 
 class VariationalDecoder0(nn.Module):
-    def __init__(self, latent_dim=1849):
+    def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
 
         self.latent_dim = latent_dim
@@ -77,7 +85,7 @@ class VariationalDecoder0(nn.Module):
         return x
     
 class VariationalAutoencoder0(nn.Module):
-    def __init__(self, latent_dim=1849):
+    def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
 
         self.encoder = VariationalEncoder0(latent_dim)
@@ -98,7 +106,7 @@ class VariationalAutoencoder0(nn.Module):
         return x_hat, mu, logvar
 
 class VariationalEncoder1(nn.Module):
-    def __init__(self, latent_dim=467):
+    def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
@@ -135,7 +143,7 @@ class VariationalEncoder1(nn.Module):
         return mu, logvar
     
 class VariationalDecoder1(nn.Module):
-    def __init__(self, latent_dim=467):
+    def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
         self.fc = nn.Linear(self.latent_dim, 16 * 16 * 32)
@@ -167,7 +175,7 @@ class VariationalDecoder1(nn.Module):
         return x
     
 class VariationalAutoencoder1(nn.Module):
-    def __init__(self, latent_dim=467):
+    def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder1(self.latent_dim)
@@ -190,7 +198,7 @@ class VariationalAutoencoder1(nn.Module):
 
 #################################
 class VariationalEncoder2(nn.Module):
-    def __init__(self, latent_dim=1411):
+    def __init__(self, latent_dim=LATENT_DIMS[2]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -231,7 +239,7 @@ class VariationalEncoder2(nn.Module):
         return mu, logvar
     
 class VariationalDecoder2(nn.Module):
-    def __init__(self, latent_dim=1411):
+    def __init__(self, latent_dim=LATENT_DIMS[2]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -266,7 +274,7 @@ class VariationalDecoder2(nn.Module):
         return x
     
 class VariationalAutoencoder2(nn.Module):
-    def __init__(self, latent_dim=1411):
+    def __init__(self, latent_dim=LATENT_DIMS[2]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder2(self.latent_dim)
@@ -290,7 +298,7 @@ class VariationalAutoencoder2(nn.Module):
 
 #################################
 class VariationalEncoder3(nn.Module):
-    def __init__(self, latent_dim=1674):
+    def __init__(self, latent_dim=LATENT_DIMS[3]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -320,7 +328,7 @@ class VariationalEncoder3(nn.Module):
         return mu, logvar
     
 class VariationalDecoder3(nn.Module):
-    def __init__(self, latent_dim=1674):
+    def __init__(self, latent_dim=LATENT_DIMS[3]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -346,7 +354,7 @@ class VariationalDecoder3(nn.Module):
         return x
     
 class VariationalAutoencoder3(nn.Module):
-    def __init__(self, latent_dim=1674):
+    def __init__(self, latent_dim=LATENT_DIMS[3]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder3(self.latent_dim)
@@ -368,7 +376,7 @@ class VariationalAutoencoder3(nn.Module):
 
 #################################
 class VariationalEncoder4(nn.Module):
-    def __init__(self, latent_dim=562):
+    def __init__(self, latent_dim=LATENT_DIMS[4]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -416,7 +424,7 @@ class VariationalEncoder4(nn.Module):
         return mu, logvar
     
 class VariationalDecoder4(nn.Module):
-    def __init__(self, latent_dim=562):
+    def __init__(self, latent_dim=LATENT_DIMS[4]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -452,7 +460,7 @@ class VariationalDecoder4(nn.Module):
         return x
     
 class VariationalAutoencoder4(nn.Module):
-    def __init__(self, latent_dim=562):
+    def __init__(self, latent_dim=LATENT_DIMS[4]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder4(self.latent_dim)
@@ -475,7 +483,7 @@ class VariationalAutoencoder4(nn.Module):
 ###############################
 
 class VariationalEncoder5(nn.Module):
-    def __init__(self, latent_dim=685):
+    def __init__(self, latent_dim=LATENT_DIMS[5]):
         super().__init__()
         self.latent_dim = latent_dim
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1)
@@ -509,7 +517,7 @@ class VariationalEncoder5(nn.Module):
         return mu, logvar
     
 class VariationalDecoder5(nn.Module):
-    def __init__(self, latent_dim=685):
+    def __init__(self, latent_dim=LATENT_DIMS[5]):
         super().__init__()
         self.latent_dim = latent_dim
         self.fc = nn.Linear(self.latent_dim, 16 * 16 * 8)
@@ -536,7 +544,7 @@ class VariationalDecoder5(nn.Module):
         return x
     
 class VariationalAutoencoder5(nn.Module):
-    def __init__(self, latent_dim=685):
+    def __init__(self, latent_dim=LATENT_DIMS[5]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder5(self.latent_dim)
@@ -559,7 +567,7 @@ class VariationalAutoencoder5(nn.Module):
 ################################################
 
 class VariationalEncoder6(nn.Module):
-    def __init__(self, latent_dim=1262):
+    def __init__(self, latent_dim=LATENT_DIMS[6]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -590,7 +598,7 @@ class VariationalEncoder6(nn.Module):
         return mu, logvar
     
 class VariationalDecoder6(nn.Module):
-    def __init__(self, latent_dim=1262):
+    def __init__(self, latent_dim=LATENT_DIMS[6]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -615,7 +623,7 @@ class VariationalDecoder6(nn.Module):
         return x
     
 class VariationalAutoencoder6(nn.Module):
-    def __init__(self, latent_dim=1262):
+    def __init__(self, latent_dim=LATENT_DIMS[6]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder6(self.latent_dim)
@@ -638,7 +646,7 @@ class VariationalAutoencoder6(nn.Module):
 ################################################
 
 class VariationalEncoder7(nn.Module):
-    def __init__(self, latent_dim=1960):
+    def __init__(self, latent_dim=LATENT_DIMS[7]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -669,7 +677,7 @@ class VariationalEncoder7(nn.Module):
         return mu, logvar
     
 class VariationalDecoder7(nn.Module):
-    def __init__(self, latent_dim=1960):
+    def __init__(self, latent_dim=LATENT_DIMS[7]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -695,7 +703,7 @@ class VariationalDecoder7(nn.Module):
         return x
     
 class VariationalAutoencoder7(nn.Module):
-    def __init__(self, latent_dim=1960):
+    def __init__(self, latent_dim=LATENT_DIMS[7]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder7(self.latent_dim)
@@ -718,7 +726,7 @@ class VariationalAutoencoder7(nn.Module):
 
 ##########################################
 class VariationalEncoder8(nn.Module):
-    def __init__(self, latent_dim=838):
+    def __init__(self, latent_dim=LATENT_DIMS[8]):
         super().__init__()
         self.latent_dim = latent_dim
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
@@ -747,7 +755,7 @@ class VariationalEncoder8(nn.Module):
         return mu, logvar
     
 class VariationalDecoder8(nn.Module):
-    def __init__(self, latent_dim=838):
+    def __init__(self, latent_dim=LATENT_DIMS[8]):
         super().__init__()
         self.latent_dim = latent_dim
         self.fc = nn.Linear(self.latent_dim, 32 * 32 * 128)
@@ -771,7 +779,7 @@ class VariationalDecoder8(nn.Module):
         return x
     
 class VariationalAutoencoder8(nn.Module):
-    def __init__(self, latent_dim=838):
+    def __init__(self, latent_dim=LATENT_DIMS[8]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder8(self.latent_dim)
@@ -793,7 +801,7 @@ class VariationalAutoencoder8(nn.Module):
     
 ##########################################
 class VariationalEncoder9(nn.Module):
-    def __init__(self, latent_dim=148):
+    def __init__(self, latent_dim=LATENT_DIMS[9]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -833,7 +841,7 @@ class VariationalEncoder9(nn.Module):
         return mu, logvar
     
 class VariationalDecoder9(nn.Module):
-    def __init__(self, latent_dim=148):
+    def __init__(self, latent_dim=LATENT_DIMS[9]):
         super().__init__()
         self.latent_dim = latent_dim
 
@@ -867,7 +875,7 @@ class VariationalDecoder9(nn.Module):
         return x
     
 class VariationalAutoencoder9(nn.Module):
-    def __init__(self, latent_dim=148):
+    def __init__(self, latent_dim=LATENT_DIMS[9]):
         super().__init__()
         self.latent_dim = latent_dim
         self.encoder = VariationalEncoder9(self.latent_dim)
