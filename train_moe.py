@@ -10,7 +10,7 @@ import tqdm
 from sklearn.metrics import accuracy_score
 
 from torch.utils.data import Dataset, DataLoader
-from src.models.moe import MoECNN
+from src.models.moe import SparseMoE
 from src.utils.datasets import CustomImageDataset
 
 import torch
@@ -25,19 +25,22 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 
+from src.config import Config
 
-model = MoECNN(n_experts=10, top_k=3)
+config = Config()
 
-data_train = CustomImageDataset(csv='/home/lucas/Representation-Fusion/CSV/PUC/PUC_.csv', autoencoder=False)
-data_val = CustomImageDataset(csv='/home/lucas/Representation-Fusion/CSV/PUC/PUC_.csv', autoencoder=False)
-data_test = CustomImageDataset(csv='/home/lucas/Representation-Fusion/CSV/PUC/PUC_.csv', autoencoder=False)
+model = SparseMoE(n_experts=4, top_k=2)
+
+data_train = CustomImageDataset(csv='/home/lucas.ocunha/Conditional-Autoencoder/CSV/PUC/batches/batche-1024.csv', autoencoder=False)
+data_val = CustomImageDataset(csv='/home/lucas.ocunha/Conditional-Autoencoder/CSV/PUC/PUC_validation.csv', autoencoder=False)
+data_test = CustomImageDataset(csv='/home/lucas.ocunha/Conditional-Autoencoder/CSV/PUC/PUC_test.csv', autoencoder=False)
 
 train_loader = DataLoader(data_train, num_worker=2, pin_memory=True)
 val_loader = DataLoader(data_val, num_worker=2, pin_memory=True)
 test_loader = DataLoader(data_test, num_worker=2, pin_memory=True)
 
 
-mlflow.set_tracking_uri('http://136.248.106.79:5000')
+mlflow.set_tracking_uri(config.IP_LOCAL)
 
     
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -62,7 +65,7 @@ with mlflow.start_run(run_name='Teste-MOE'):
 
         train_loss, train_correct, train_total = 0, 0, 0
 
-        for x, y, idx in train_loader:
+        for x, y, idx in tqdm(train_loader, desc='Train'):
             x = x.to(device)
             y = y.to(device)
 
@@ -90,14 +93,14 @@ with mlflow.start_run(run_name='Teste-MOE'):
         val_correct = 0
         val_total = 0
         with torch.no_grad():
-            for x, y, _ in val_loader:
+            for x, y, _ in tqdm(val_loader, desc='Val'):
                 x = x.to(device, non_blocking=True)
                 y = y.to(device, non_blocking=True)
 
                 with torch.cuda.amp.autocast():
                     out, balance_loss = model(x)
                     task_loss = criterion(out, y)
-                    
+
                 loss = task_loss + 0.01 * balance_loss
                 val_loss += loss.item()
                 val_correct += (out.argmax(1) == y).sum().item()
@@ -114,7 +117,7 @@ with mlflow.start_run(run_name='Teste-MOE'):
         y_true, y_pred = [], []
 
         with torch.no_grad():
-            for x, y, idx in test_loader:
+            for x, y, idx in tqdm(test_loader, desc='Test'):
                 x = x.to(device)
                 y = y.to(device)
 
