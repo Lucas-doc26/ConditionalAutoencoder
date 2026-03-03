@@ -2,29 +2,29 @@ import mlflow
 import pandas as pd
 from src.config import *
 
+Config = Config()
 
 dataframe_final = pd.DataFrame()
 
-for i in range(1, 10):
-    for type in ["AE", "Skip"]:
-        EXPERIMENT_NAME = f"Classifier_{type}_{i}"
-        OUTPUT_CSV = "mlflow_runs.csv"
+for type in ["AE", "Skip"]:
+    EXPERIMENT_NAME = f"Classifier_{type}_0"
+    OUTPUT_CSV = "metrics_classifiers_0.csv"
 
-        mlflow.set_tracking_uri(Config.IP_LOCAL)
+    mlflow.set_tracking_uri(Config.IP_LOCAL)
 
-        experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
 
-        if experiment is None:
-            raise ValueError(f"Experimento '{EXPERIMENT_NAME}' não encontrado.")
+    if experiment is None:
+        raise ValueError(f"Experimento '{EXPERIMENT_NAME}' não encontrado.")
 
-        experiment_id = experiment.experiment_id
+    experiment_id = experiment.experiment_id
 
-        df = mlflow.search_runs(
-            experiment_ids=[experiment_id],
-            output_format="pandas"
-        )
+    df = mlflow.search_runs(
+        experiment_ids=[experiment_id],
+        output_format="pandas"
+    )
 
-        dataframe_final = pd.concat([dataframe_final, df], ignore_index=True)
+    dataframe_final = pd.concat([dataframe_final, df], ignore_index=True)
 
 print(f"✅ {len(dataframe_final)} runs exportados para {OUTPUT_CSV}")
 dataframe_final.to_csv(OUTPUT_CSV, index=False)

@@ -28,9 +28,11 @@ from src.utils.plot import log_confusion_matrix_mlflow
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = False
 
-NUM_WORKS = 4
+NUM_WORKS = 2
 PIN_MEMORY = True
 PERSISTENT_WORKERS = True
+
+config = Config()
 
 
 # Utils
@@ -61,7 +63,7 @@ def train_classifier(
     num_epochs=10,
     lr=1e-3
 ):
-    device = Config.DEVICES[gpu_id]
+    device = config.DEVICES[gpu_id]
     transform = return_transform()
     pin_memory = isinstance(device, str) and device.startswith("cuda")
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -98,12 +100,16 @@ def train_classifier(
 
     if re.search(r"^Skip", model_encoder.__name__):
         name_encoder = f"SkipAutoencoder{model_encoder.__name__[-1]}"
+    
+    elif re.search(r"^VariationalEncoder", model_encoder.__name__):
+        name_encoder = f"VariationalAutoencoder{model_encoder.__name__[-1]}"
+
     else:
         name_encoder = f"Autoencoder{model_encoder.__name__[-1]}"
 
     encoder.load_state_dict(
         torch.load(
-            f"models/{name_encoder}_{dataset_encoder_name}/encoder.pth",
+            f"models/{name_encoder}/{dataset_encoder_name}/encoder.pth",
             map_location=device
         )
     )
@@ -145,34 +151,22 @@ def train_classifier(
             train_dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=0,
+            num_workers=NUM_WORKS,
             pin_memory=pin_memory,
-            persistent_workers=False
+            persistent_workers=PERSISTENT_WORKERS
         )
 
         val_loader = DataLoader(
             val_dataset,
             batch_size=batch_size,
             shuffle=False,
-            num_workers=0,
+            num_workers=NUM_WORKS,
             pin_memory=pin_memory,
-            persistent_workers=False
+            persistent_workers=PERSISTENT_WORKERS
         )
 
         model_name = f"{model_encoder.__name__}_Classifier"
         
-        # -----------------------------
-        # Cache test loaders
-        # -----------------------------
-        test_loaders = {
-            name: make_test_loader(
-                os.path.join(csv_root, name, f"{name}_test.csv"),
-                transform,
-                batch_size,
-                pin_memory
-            )
-            for name in datasets_test
-        }
 
         # ========================================================
         # MLflow run
@@ -251,17 +245,27 @@ def train_classifier(
                 mlflow.log_metric("val_loss", val_loss, step=epoch)
                 mlflow.log_metric("val_acc", val_acc, step=epoch)
 
+            del train_loader, val_loader
+
             # TEST (offline style)
             test_results = {}
             model.eval()
 
-            for name, loader in test_loaders.items():
+            for name in datasets_test:
+
+                test_loader = make_test_loader(
+                        os.path.join(csv_root, name, f"{name}_test.csv"),
+                        transform,
+                        batch_size,
+                        pin_memory
+                    )
+
                 y_true, y_pred = [], []
                 all_logits, all_ids = [], []
 
                 with torch.no_grad():
                     for x, y, idx in tqdm(
-                        loader,
+                        test_loader,
                         desc=f"[GPU {gpu_id}] Testing on {name}",
                         position=gpu_id
                     ):
@@ -292,8 +296,9 @@ def train_classifier(
                     "ids": np.array(all_ids),
                 }
 
-                del y_true, y_pred, all_logits, all_ids
+                del y_true, y_pred, all_logits, all_ids, test_loader
                 torch.cuda.empty_cache()
+
                             
             # Log results
             for name, r in test_results.items():
@@ -318,7 +323,7 @@ def train_classifier(
                         probs=r["logits"],          # já float16
                         ids=r["ids"]
                     )
-
+    
             #mlflow.pytorch.log_model(model, "classifier")
 
             """os.makedirs(
@@ -336,10 +341,10 @@ def train_classifier(
 
 
 def worker(rank, jobs_by_gpu):
-    gpu = Config.DEVICES[rank]
+    gpu = config.DEVICES[rank]
     torch.cuda.set_device(gpu)
 
-    mlflow.set_tracking_uri(Config.IP_LOCAL)
+    mlflow.set_tracking_uri(config.IP_LOCAL)
 
     my_jobs = jobs_by_gpu[rank]
 
@@ -367,14 +372,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ENCODERS = [
-        Encoder0, Encoder1, Encoder2, Encoder3, Encoder4,
-        Encoder5, Encoder6, Encoder7, Encoder8, Encoder9
+        Encoder9
     ]
 
     SKIP_ENCODERS = [
-        SkipEncoder0, SkipEncoder1, SkipEncoder2, SkipEncoder3,
-        SkipEncoder4, SkipEncoder5, SkipEncoder6, SkipEncoder7,
-        SkipEncoder8, SkipEncoder9
+        SkipEncoder9
     ]
 
     VAE_ENCODERS = [
@@ -418,11 +420,11 @@ if __name__ == "__main__":
     vae_gpu1 = vae_encoder_jobs[half:]
 
     jobs_by_gpu = {
-        0: encoder_jobs + vae_gpu0,
-        1: skip_encoder_jobs + vae_gpu1,
+        0: skip_encoder_jobs + vae_gpu0,
+        1: encoder_jobs + vae_gpu1,
     }
 
-    assert len(Config.DEVICES) >= 2, "Você precisa de pelo menos 2 GPUs"
+    assert len(config.DEVICES) >= 2, "Você precisa de pelo menos 2 GPUs"
 
     mp.set_start_method("spawn", force=True)
     mp.spawn(

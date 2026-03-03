@@ -14,7 +14,9 @@ class CustomImageDataset(Dataset):
 
     def __getitem__(self, idx): 
         img_path = self.df.iloc[idx, 0] 
-        image = Image.open(img_path).convert("RGB") 
+        with Image.open(img_path) as img:
+            image = img.convert("RGB")
+            
         label = self.df.iloc[idx, 1] 
 
         if self.transform: 
