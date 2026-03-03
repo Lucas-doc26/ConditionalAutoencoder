@@ -13,6 +13,19 @@ from torch.utils.data import Dataset, DataLoader
 from src.models.moe import MoECNN
 from src.utils.datasets import CustomImageDataset
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+import pandas as pd
+import argparse
+import os
+from datetime import datetime
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+from PIL import Image
+
+
 model = MoECNN(n_experts=10, top_k=3)
 
 data_train = CustomImageDataset(csv='/home/lucas/Representation-Fusion/CSV/PUC/PUC_.csv', autoencoder=False)
@@ -56,9 +69,10 @@ with mlflow.start_run(run_name='Teste-MOE'):
             optimizer.zero_grad()
 
             with torch.cuda.amp.autocast():
-                out = model(x)
-                loss = criterion(out, y)
+                out, balance_loss = model(x)
+                task_loss = criterion(out, y)
 
+            loss = task_loss + 0.01 * balance_loss
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -81,9 +95,10 @@ with mlflow.start_run(run_name='Teste-MOE'):
                 y = y.to(device, non_blocking=True)
 
                 with torch.cuda.amp.autocast():
-                    out = model(x)
-                    loss = criterion(out, y)
-
+                    out, balance_loss = model(x)
+                    task_loss = criterion(out, y)
+                    
+                loss = task_loss + 0.01 * balance_loss
                 val_loss += loss.item()
                 val_correct += (out.argmax(1) == y).sum().item()
                 val_total += y.size(0)
@@ -104,7 +119,7 @@ with mlflow.start_run(run_name='Teste-MOE'):
                 y = y.to(device)
 
                 with torch.cuda.amp.autocast():
-                    out = model(x)
+                    out, balance_loss = model(x)
 
                 preds = out.argmax(1)
 
