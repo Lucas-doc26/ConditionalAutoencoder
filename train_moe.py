@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import datetime 
 import mlflow 
-import tqdm
+from tqdm import tqdm 
 
 from sklearn.metrics import accuracy_score
 
@@ -31,25 +31,51 @@ config = Config()
 
 model = SparseMoE(n_experts=4, top_k=2)
 
-data_train = CustomImageDataset(csv='/home/lucas.ocunha/Conditional-Autoencoder/CSV/PUC/batches/batche-1024.csv', autoencoder=False)
-data_val = CustomImageDataset(csv='/home/lucas.ocunha/Conditional-Autoencoder/CSV/PUC/PUC_validation.csv', autoencoder=False)
-data_test = CustomImageDataset(csv='/home/lucas.ocunha/Conditional-Autoencoder/CSV/PUC/PUC_test.csv', autoencoder=False)
+class ImageDataset(Dataset):
+    def __init__(self, csv):
+        self.data = pd.read_csv(csv)
 
-train_loader = DataLoader(data_train, num_worker=2, pin_memory=True)
-val_loader = DataLoader(data_val, num_worker=2, pin_memory=True)
-test_loader = DataLoader(data_test, num_worker=2, pin_memory=True)
+        self.transform = transforms.Compose([
+            transforms.Resize((124, 124)),   # garante 124x124
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], #padrão ImageNet
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img_path = self.data.iloc[idx, 0]
+
+        image = Image.open(img_path).convert('RGB')
+        image = np.array(image).transpose(2, 0, 1)  # [H,W,C] -> [C,H,W]
+        image = torch.from_numpy(image).float() / 255.0
+
+        image = self.transform(image)
+
+        label = int(self.data.iloc[idx, 1])
+
+        return image, label, idx
+
+
+data_train = ImageDataset(csv='/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/batches/batch-64.csv')
+data_val = ImageDataset(csv='/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/PUC_validation.csv')
+data_test = ImageDataset(csv='/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/PUC_test.csv')
+
+train_loader = DataLoader(data_train, num_workers=2, pin_memory=True)
+val_loader = DataLoader(data_val, num_workers=2, pin_memory=True)
+test_loader = DataLoader(data_test, num_workers=2, pin_memory=True)
 
 
 mlflow.set_tracking_uri(config.IP_LOCAL)
-
+mlflow.set_experiment('Moe')
     
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda:1" if torch.cuda.is_available() else "cpu"
+model.to(device)
 
-with mlflow.start_run(run_name='Teste-MOE'):
-    mlflow.log_input(data_train, context='Train')
-    mlflow.log_input(data_val, context='Val')
-    mlflow.log_input(data_test, context='Test')
-
+with mlflow.start_run(run_name='MOE'):
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters())
@@ -62,7 +88,7 @@ with mlflow.start_run(run_name='Teste-MOE'):
     ):
         
         model.train()
-
+        model.float() 
         train_loss, train_correct, train_total = 0, 0, 0
 
         for x, y, idx in tqdm(train_loader, desc='Train'):
@@ -74,8 +100,8 @@ with mlflow.start_run(run_name='Teste-MOE'):
             with torch.cuda.amp.autocast():
                 out, balance_loss = model(x)
                 task_loss = criterion(out, y)
+                loss = task_loss + 0.01 * balance_loss
 
-            loss = task_loss + 0.01 * balance_loss
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -100,8 +126,8 @@ with mlflow.start_run(run_name='Teste-MOE'):
                 with torch.cuda.amp.autocast():
                     out, balance_loss = model(x)
                     task_loss = criterion(out, y)
+                    loss = task_loss + 0.01 * balance_loss
 
-                loss = task_loss + 0.01 * balance_loss
                 val_loss += loss.item()
                 val_correct += (out.argmax(1) == y).sum().item()
                 val_total += y.size(0)

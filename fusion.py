@@ -127,14 +127,16 @@ def run_all_fusions():
 
     base_pattern = (
         "/home/lucas.ocunha/ConditionalAutoencoder/models/"
-        "{type_of_encoder}{encoder}_Classifier_{dataset_encoder}/{batch}/preds/"
+        "{type_of_encoder}{encoder}_Classifier/{dataset_train}/encoder_{dataset_encoder}/{batch}/preds/"
         "{dataset_test}/outputs.npz"
     )
 
-    type_of_encoders = ["Encoder", "SkipEncoder"]
-    dataset_encoders = ["camera1","camera2","camera3","camera4","camera5",
+    type_of_encoders = ["Encoder", "SkipEncoder", "VariationalEncoder"]
+    dataset_encoders = ["CNR", 'PKLot']
+    datasets_train = ["camera1","camera2","camera3","camera4","camera5",
         "camera6","camera7","camera8","camera9",
         "PUC","UFPR04","UFPR05"]
+    
     dataset_tests = [
         "camera1","camera2","camera3","camera4","camera5",
         "camera6","camera7","camera8","camera9",
@@ -145,111 +147,113 @@ def run_all_fusions():
     csv_results_path = "fusion_metrics.csv"
 
     for type_of_encoder in type_of_encoders:
-        for dataset_encoder in dataset_encoders:
-            for batch in batches:
-                for dataset_test in dataset_tests:
+        for dataset_train in datasets_train:
+            for dataset_encoder in dataset_encoders:
+                for batch in batches:
+                    for dataset_test in dataset_tests:
 
-                    print(f"\nProcessing {type_of_encoder} | {dataset_encoder} | {dataset_test} | batch {batch}")
+                        print(f"\nProcessing {type_of_encoder} | {dataset_train} | {dataset_encoder} | {dataset_test} | batch {batch}")
 
-                    models_outputs = []
+                        models_outputs = []
 
-                    for encoder in range(10):
-                        path = base_pattern.format(
-                            type_of_encoder=type_of_encoder,
-                            encoder=encoder,
-                            dataset_encoder=dataset_encoder,
-                            dataset_test=dataset_test,
-                            batch=batch
-                        )
+                        for encoder in range(10):
+                            path = base_pattern.format(
+                                type_of_encoder=type_of_encoder,
+                                encoder=encoder,
+                                dataset_train=dataset_train,
+                                dataset_encoder=dataset_encoder,
+                                dataset_test=dataset_test,
+                                batch=batch
+                            )
 
-                        if os.path.exists(path):
-                            probs, ids = load_npz(path)
-                            models_outputs.append((probs, ids))
+                            if os.path.exists(path):
+                                probs, ids = load_npz(path)
+                                models_outputs.append((probs, ids))
 
-                    if len(models_outputs) == 0:
-                        print("No models found. Skipping.")
-                        continue
+                        if len(models_outputs) == 0:
+                            print("No models found. Skipping.")
+                            continue
 
-                    gt_ids, gt_labels = load_ground_truth(dataset_test)
-                    stacked, y_true, common_ids = align_predictions(models_outputs, gt_ids, gt_labels)
+                        gt_ids, gt_labels = load_ground_truth(dataset_test)
+                        stacked, y_true, common_ids = align_predictions(models_outputs, gt_ids, gt_labels)
 
-                    # =====================================================
-                    # Individual model statistics
-                    # =====================================================
+                        # =====================================================
+                        # Individual model statistics
+                        # =====================================================
 
-                    individual_acc = []
-                    individual_prec = []
+                        individual_acc = []
+                        individual_prec = []
 
-                    for probs, ids in models_outputs:
+                        for probs, ids in models_outputs:
 
-                        id_to_gt = {int(i): l for i, l in zip(gt_ids, gt_labels)}
-                        id2idx = {int(i): idx for idx, i in enumerate(ids.tolist())}
-                        rows = [id2idx[int(cid)] for cid in common_ids]
+                            id_to_gt = {int(i): l for i, l in zip(gt_ids, gt_labels)}
+                            id2idx = {int(i): idx for idx, i in enumerate(ids.tolist())}
+                            rows = [id2idx[int(cid)] for cid in common_ids]
 
-                        preds = np.argmax(probs[rows], axis=1)
-                        y_true_ind = np.array([id_to_gt[int(cid)] for cid in common_ids])
+                            preds = np.argmax(probs[rows], axis=1)
+                            y_true_ind = np.array([id_to_gt[int(cid)] for cid in common_ids])
 
-                        acc = accuracy_score(y_true_ind, preds)
-                        prec = precision_score(y_true_ind, preds, average="macro", zero_division=0)
+                            acc = accuracy_score(y_true_ind, preds)
+                            prec = precision_score(y_true_ind, preds, average="macro", zero_division=0)
 
-                        individual_acc.append(acc)
-                        individual_prec.append(prec)
+                            individual_acc.append(acc)
+                            individual_prec.append(prec)
 
-                    mean_ind_acc = np.mean(individual_acc)
-                    std_ind_acc = np.std(individual_acc)
-                    mean_ind_prec = np.mean(individual_prec)
-                    std_ind_prec = np.std(individual_prec)
+                        mean_ind_acc = np.mean(individual_acc)
+                        std_ind_acc = np.std(individual_acc)
+                        mean_ind_prec = np.mean(individual_prec)
+                        std_ind_prec = np.std(individual_prec)
 
-                    # Save baseline
-                    baseline_row = {
-                        "tipo_encoder": type_of_encoder,
-                        "dataset_encoder": dataset_encoder,
-                        "dataset_test": dataset_test,
-                        "batch": batch,
-                        "tecnica_fusao": "mean_individual_models",
-                        "precision": round(mean_ind_prec, 6),
-                        "precision_std": round(std_ind_prec, 6),
-                        "accuracy": round(mean_ind_acc, 6),
-                        "accuracy_std": round(std_ind_acc, 6)
-                    }
-
-                    save_row(csv_results_path, baseline_row)
-
-                    # =====================================================
-                    # Fusion methods
-                    # =====================================================
-
-                    fusion_methods = {
-                        "sum": fusion_sum,
-                        "mean_probs": fusion_mean,
-                        "max": fusion_max,
-                        "mult": fusion_mult,
-                        "vote": fusion_vote
-                    }
-
-                    for name, func in fusion_methods.items():
-
-                        fused_probs = func(stacked)
-                        preds = np.argmax(fused_probs, axis=1)
-
-                        acc = accuracy_score(y_true, preds)
-                        prec = precision_score(y_true, preds, average="macro", zero_division=0)
-
-                        row = {
+                        # Save baseline
+                        baseline_row = {
                             "tipo_encoder": type_of_encoder,
                             "dataset_encoder": dataset_encoder,
                             "dataset_test": dataset_test,
                             "batch": batch,
-                            "tecnica_fusao": name,
-                            "precision": round(prec, 6),
-                            "precision_std": 0.0,
-                            "accuracy": round(acc, 6),
-                            "accuracy_std": 0.0
+                            "tecnica_fusao": "mean_individual_models",
+                            "precision": round(mean_ind_prec, 6),
+                            "precision_std": round(std_ind_prec, 6),
+                            "accuracy": round(mean_ind_acc, 6),
+                            "accuracy_std": round(std_ind_acc, 6)
                         }
 
-                        save_row(csv_results_path, row)
+                        save_row(csv_results_path, baseline_row)
 
-                    print("Saved metrics.")
+                        # =====================================================
+                        # Fusion methods
+                        # =====================================================
+
+                        fusion_methods = {
+                            "sum": fusion_sum,
+                            "mean_probs": fusion_mean,
+                            "max": fusion_max,
+                            "mult": fusion_mult,
+                            "vote": fusion_vote
+                        }
+
+                        for name, func in fusion_methods.items():
+
+                            fused_probs = func(stacked)
+                            preds = np.argmax(fused_probs, axis=1)
+
+                            acc = accuracy_score(y_true, preds)
+                            prec = precision_score(y_true, preds, average="macro", zero_division=0)
+
+                            row = {
+                                "tipo_encoder": type_of_encoder,
+                                "dataset_encoder": dataset_encoder,
+                                "dataset_test": dataset_test,
+                                "batch": batch,
+                                "tecnica_fusao": name,
+                                "precision": round(prec, 6),
+                                "precision_std": 0.0,
+                                "accuracy": round(acc, 6),
+                                "accuracy_std": 0.0
+                            }
+
+                            save_row(csv_results_path, row)
+
+                        print("Saved metrics.")
 
 
 # =========================================================
