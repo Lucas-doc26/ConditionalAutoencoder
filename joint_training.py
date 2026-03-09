@@ -46,23 +46,27 @@ model_1 = Classifier(skip_1, latent_dim=skip_1.latent_dim, num_classes=2)
 model_1.to(device) 
 
  
-# Initialize parameters
  
 for m in model_0.modules():
     if isinstance(m, nn.Conv2d):
         init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
     elif isinstance(m, nn.Linear):
         init.xavier_normal_(m.weight)
+
+for m in model_1.modules():
+    if isinstance(m, nn.Conv2d):
+        init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+    elif isinstance(m, nn.Linear):
+        init.xavier_normal_(m.weight)
  
-# Define loss function
-criterion_cnn = nn.CrossEntropyLoss()
-criterion_rnn = nn.CrossEntropyLoss()
+criterion_model_0 = nn.CrossEntropyLoss()
+criterion_model_1 = nn.CrossEntropyLoss()
  
  
 def combined_loss(output_model_0, output_model_1, target):
-    loss_cnn = criterion_cnn(output_model_0, target)
-    loss_rnn = criterion_rnn(output_model_1, target)
-    return loss_cnn + loss_rnn
+    loss_model_0 = criterion_model_0(output_model_0, target)
+    loss_model_1 = criterion_model_1(output_model_1, target)
+    return (0.2 * loss_model_0) + (0.8 * loss_model_1)
  
  
 # Define optimizer
@@ -71,7 +75,7 @@ optimizer = optim.Adam(parameters, lr=0.001)
 scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
  
  
-num_epochs = 100
+num_epochs = 200
 best_val_loss = float('inf')
 patience = 5
 counter = 0
