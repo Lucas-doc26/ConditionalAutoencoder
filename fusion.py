@@ -242,6 +242,7 @@ def run_all_fusions():
 
                             row = {
                                 "tipo_encoder": type_of_encoder,
+                                "dataset_train": dataset_train,
                                 "dataset_encoder": dataset_encoder,
                                 "dataset_train": dataset_train,
                                 "dataset_test": dataset_test,
