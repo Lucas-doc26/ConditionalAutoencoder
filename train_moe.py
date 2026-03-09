@@ -1,9 +1,6 @@
-import argparse
 import torch
 import torch.nn as nn
-import os 
 import pandas as pd
-import datetime 
 import mlflow 
 from tqdm import tqdm 
 
@@ -11,17 +8,8 @@ from sklearn.metrics import accuracy_score
 
 from torch.utils.data import Dataset, DataLoader
 from src.models.moe import SparseMoE
-from src.utils.datasets import CustomImageDataset
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import pandas as pd
-import argparse
-import os
-from datetime import datetime
-from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 

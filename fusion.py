@@ -208,6 +208,7 @@ def run_all_fusions():
                         baseline_row = {
                             "tipo_encoder": type_of_encoder,
                             "dataset_encoder": dataset_encoder,
+                            "dataset_train": dataset_train,
                             "dataset_test": dataset_test,
                             "batch": batch,
                             "tecnica_fusao": "mean_individual_models",
@@ -242,6 +243,7 @@ def run_all_fusions():
                             row = {
                                 "tipo_encoder": type_of_encoder,
                                 "dataset_encoder": dataset_encoder,
+                                "dataset_train": dataset_train,
                                 "dataset_test": dataset_test,
                                 "batch": batch,
                                 "tecnica_fusao": name,
