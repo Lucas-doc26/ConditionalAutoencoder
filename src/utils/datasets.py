@@ -1,7 +1,8 @@
 from torch.utils.data import Dataset
 import pandas as pd
 from PIL import Image
-
+import numpy as np
+from .transform import return_transform
 
 class CustomImageDataset(Dataset): 
     def __init__(self, csv, transform=None, autoencoder=True): 
@@ -25,4 +26,4 @@ class CustomImageDataset(Dataset):
         if self.autoencoder: 
             label = image 
 
-        return image, label, idx
+        return np.array(image), label, idx
