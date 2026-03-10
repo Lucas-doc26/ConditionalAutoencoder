@@ -3,10 +3,6 @@ import pandas as pd
 from PIL import Image
 import numpy as np
 from .transform import return_transform
-<<<<<<< HEAD
-=======
-
->>>>>>> 11939df2bd4cf400a6814788665de917c834e9ff
 
 class CustomImageDataset(Dataset): 
     def __init__(self, csv, transform=True, autoencoder=True): 
