@@ -53,7 +53,13 @@ def combined_loss(output_model_0, output_model_1, target):
     
     euclidean_distance_loss_value = euclidean_distance_loss(output_model_0, output_model_1)
     
-    total_loss = ((loss_mse_0 * 0.6 + ssim_loss_value_0 * 0.4) + (loss_mse_1 * 0.6 + ssim_loss_value_1 * 0.4)) * 0.5 + euclidean_distance_loss_value * 0.5
+    # Perda de reconstrução combinada
+    reconstruction_loss = 0.5 * ((loss_mse_0 * 0.6 + ssim_loss_value_0 * 0.4) + (loss_mse_1 * 0.6 + ssim_loss_value_1 * 0.4))
+    
+    # Perda de divergência: negativa para encorajar diferença
+    divergence_loss = -euclidean_distance_loss_value
+    
+    total_loss = reconstruction_loss + divergence_loss
     return total_loss
 
  
@@ -77,6 +83,7 @@ for epoch in tqdm(range(num_epochs), desc='Epochs'):
         output_joint_0 = joint_0(x)
         output_joint_1 = joint_1(x)
     
+
         loss = combined_loss(output_joint_0, output_joint_1, y)
         running_loss += loss.item()
 
