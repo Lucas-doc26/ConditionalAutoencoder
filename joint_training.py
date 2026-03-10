@@ -44,7 +44,7 @@ criterion_model_1 = nn.MSELoss()
 
 from src.models.loss.autoencoder_loss import ssim_loss, euclidean_distance_loss
  
-def combined_loss(output_model_0, output_model_1, target):
+def combined_loss(output_model_0, output_model_1, target, mse_weight=0.6, ssim_weight=0.4, rec_weight=0.5):
     loss_mse_0 = criterion_model_0(output_model_0, target)
     loss_mse_1 = criterion_model_1(output_model_1, target)
 
@@ -54,7 +54,7 @@ def combined_loss(output_model_0, output_model_1, target):
     euclidean_distance_loss_value = euclidean_distance_loss(output_model_0, output_model_1)
     
     # Perda de reconstrução combinada
-    reconstruction_loss = 0.5 * ((loss_mse_0 * 0.6 + ssim_loss_value_0 * 0.4) + (loss_mse_1 * 0.6 + ssim_loss_value_1 * 0.4))
+    reconstruction_loss = rec_weight * ((loss_mse_0 * mse_weight + ssim_loss_value_0 * ssim_weight) + (loss_mse_1 * mse_weight + ssim_loss_value_1 * ssim_weight))
     
     # Perda de divergência: negativa para encorajar diferença
     divergence_loss = -euclidean_distance_loss_value
@@ -62,78 +62,94 @@ def combined_loss(output_model_0, output_model_1, target):
     total_loss = reconstruction_loss + divergence_loss
     return total_loss
 
- 
-# Define optimizer
-parameters = list(joint_0.parameters()) + list(joint_1.parameters())
-optimizer = torch.optim.Adam(parameters)
-scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
- 
- 
-num_epochs = 20
-for epoch in tqdm(range(num_epochs), desc='Epochs'):
+def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=5):
+    joint_0 = JointAutoencoder0()
+    joint_1 = JointAutoencoder1()
+
+    joint_0.to(device)
+    joint_1.to(device)
+
+    parameters = list(joint_0.parameters()) + list(joint_1.parameters())
+    optimizer = torch.optim.Adam(parameters)
+    scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
     
-    joint_0.train()
-    joint_1.train()
-    
-    running_loss = 0.0
-    
-    for x, y, _ in train_loader:
-        x, y = x.to(device), y.to(device)
+    for epoch in range(num_epochs):
+        joint_0.train()
+        joint_1.train()
         
-        output_joint_0 = joint_0(x)
-        output_joint_1 = joint_1(x)
-    
-
-        loss = combined_loss(output_joint_0, output_joint_1, y)
-        running_loss += loss.item()
-
-        optimizer.zero_grad()
- 
-        loss.backward()
-    
-        # Gradient clipping
-        torch.nn.utils.clip_grad_norm_(parameters, max_norm=1.0)
-    
-        optimizer.step()
-    
-    epoch_loss = running_loss / len(train_loader)
-    scheduler.step()
-    
-    joint_0.eval()
-    joint_1.eval()
-    
-    running_val_loss = 0.0
-    
-    with torch.no_grad():
-        for x, y, _ in valid_loader:
+        running_loss = 0.0
+        
+        for x, y, _ in train_loader:
             x, y = x.to(device), y.to(device)
             
             output_joint_0 = joint_0(x)
             output_joint_1 = joint_1(x)
         
-            val_loss = combined_loss(output_joint_0, output_joint_1, y)
-            running_val_loss += val_loss.item()
+            loss = combined_loss(output_joint_0, output_joint_1, y, mse_weight, ssim_weight, rec_weight)
+            running_loss += loss.item()
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(parameters, max_norm=1.0)
+            optimizer.step()
+        
+        epoch_loss = running_loss / len(train_loader)
+        scheduler.step()
+        
+        joint_0.eval()
+        joint_1.eval()
+        
+        running_val_loss = 0.0
+        
+        with torch.no_grad():
+            for x, y, _ in valid_loader:
+                x, y = x.to(device), y.to(device)
+                
+                output_joint_0 = joint_0(x)
+                output_joint_1 = joint_1(x)
+            
+                val_loss = combined_loss(output_joint_0, output_joint_1, y, mse_weight, ssim_weight, rec_weight)
+                running_val_loss += val_loss.item()
+        
+        val_epoch_loss = running_val_loss / len(valid_loader)
     
-    val_epoch_loss = running_val_loss / len(valid_loader)
- 
-    print(f'Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}, Val Loss: {val_epoch_loss:.4f}')
+    # Plot reconstructions
+    joint_0.eval()
+    joint_1.eval()
+    with torch.no_grad():
+        for x, _, _ in test_loader:
+            x = x[:8].to(device)
+            recon0 = joint_0(x)
+            recon1 = joint_1(x)
+            break
 
+    title0 = f"JointAutoencoder0_MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}"
+    title1 = f"JointAutoencoder1_MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}"
+    
+    plot_reconstruction(x, recon0, title0, "PUC", save_path='./results/Joint-Grid-Search')
+    plot_reconstruction(x, recon1, title1, "PUC", save_path='./results/Joint-Grid-Search')
+    
+    return val_epoch_loss
 
-joint_0.eval()
-joint_1.eval()
+# Grid search with more values (25 combinations)
+mse_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
+ssim_weights = [0.2, 0.3, 0.4, 0.5, 0.6]
+rec_weights = [0.3, 0.5, 0.7, 1.0]
 
-with torch.no_grad():
-    for x, _, _ in test_loader:
-        x = x[:8].to(device)
-        recon0 = joint_0(x)
-        recon1 = joint_1(x)
-        break
+results = []
 
-plot_path = plot_reconstruction(
-    x, recon0, "JointAutoencoder0", "PUC"
-)
+for mse_w in mse_weights:
+    for ssim_w in ssim_weights:
+        for rec_w in rec_weights:
+            val_loss = train_models(mse_w, ssim_w, rec_w)
+            results.append((mse_w, ssim_w, rec_w, val_loss))
+            print(f'MSE: {mse_w}, SSIM: {ssim_w}, REC: {rec_w}, Val Loss: {val_loss:.4f}')
 
-plot_path = plot_reconstruction(
-    x, recon1, "JointAutoencoder1", "PUC"
-)
+# Save results to CSV
+import csv
+with open('grid_search_results.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['MSE_Weight', 'SSIM_Weight', 'REC_Weight', 'Val_Loss'])
+    for row in results:
+        writer.writerow(row)
 
