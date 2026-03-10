@@ -13,4 +13,5 @@ class Config():
         self.DEVICE0 = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.DEVICE1 = "cuda:1" if torch.cuda.is_available() else "cpu"
         self.DEVICES = [self.DEVICE0, self.DEVICE1]
-        self.LATENT_DIMS = [latent_dims(i, range_latent) for i in range(10)]
+        self.LATENT_DIMS = [1849, 467, 1411, 1674, 562, 685, 1262, 1960, 838, 1417]
+        #self.LATENT_DIMS = [latent_dims(i, range_latent) for i in range(10)]
