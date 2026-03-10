@@ -3,11 +3,15 @@ import pandas as pd
 from PIL import Image
 import numpy as np
 from .transform import return_transform
+<<<<<<< HEAD
+=======
+
+>>>>>>> 11939df2bd4cf400a6814788665de917c834e9ff
 
 class CustomImageDataset(Dataset): 
-    def __init__(self, csv, transform=None, autoencoder=True): 
+    def __init__(self, csv, transform=True, autoencoder=True): 
         self.df = pd.read_csv(csv) 
-        self.transform = transform 
+        self.transform = return_transform() if transform else None
         self.autoencoder = autoencoder 
 
     def __len__(self): 
