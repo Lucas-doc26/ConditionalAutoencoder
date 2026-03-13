@@ -64,9 +64,9 @@ def combined_loss(output_model_0,
     reconstruction_loss = (rec0 + rec1) / 2
 
 
-    orthogonal_loss = orthogonal_loss(output_model_0, output_model_1)
+    ort_loss = orthogonal_loss(output_model_0, output_model_1)
 
-    total_loss =  reconstruction_loss + rec_weight * orthogonal_loss
+    total_loss =  reconstruction_loss + rec_weight * ort_loss
 
     return total_loss
 
@@ -139,7 +139,6 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
     
     return val_epoch_loss
 
-# Grid search with more values (25 combinations)
 mse_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
 ssim_weights = [0.2, 0.3, 0.4, 0.5, 0.6]
 rec_weights = [0.3, 0.5, 0.7, 1.0]
@@ -148,10 +147,10 @@ results = []
 
 for mse_w in mse_weights:
     for ssim_w in ssim_weights:
-        for rec in rec_weights
+        for rec in rec_weights:
             val_loss = train_models(mse_w, ssim_w, rec)
             results.append((mse_w, ssim_w, rec, val_loss))
-            print(f'MSE: {mse_w}, SSIM: {ssim_w}, Val Loss: {val_loss:.4f}')
+            print(f'MSE: {mse_w}, SSIM: {ssim_w}, REC: {rec} Val Loss: {val_loss:.4f}')
 
 # Save results to CSV
 import csv

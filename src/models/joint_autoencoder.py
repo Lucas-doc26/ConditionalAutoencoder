@@ -10,7 +10,7 @@ def combined_loss(recon_x, x):
     return recon_loss
 
 
-class SkipEncoder0(nn.Module):
+class JointEncoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
         self.latent_dim = latent_dim
@@ -34,7 +34,7 @@ class SkipEncoder0(nn.Module):
         z = self.fc(x)              # (B, LATENT_DIMS[0])
         return z, x1, x2
     
-class SkipDecoder0(nn.Module):
+class JointDecoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
         self.latent_dim = latent_dim
@@ -47,35 +47,35 @@ class SkipDecoder0(nn.Module):
 
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
-    def forward(self, z, skip1, skip2):
+    def forward(self, z, Joint1, Joint2):
         x = self.fc(z)                       # (B, 16384)
         x = x.view(-1, 16, 32, 32)           # (B, 16, 32, 32)
 
         x = F.relu(self.conv1(x))            # (B, 16, 32, 32)
         x = self.upsample(x)                 # (B, 16, 64, 64)
-        x = x + skip2                        # Skip connection
+        x = x + Joint2                        # Joint connection
 
         x = F.relu(self.conv2(x))            # (B, 8, 64, 64)
         x = self.upsample(x)                 # (B, 8, 128, 128)
-        x = x + skip1                        # Skip connection
+        x = x + Joint1                        # Joint connection
 
         x = self.conv3(x)                    # (B, 3, 128, 128)
         return x
     
-class SkipAutoencoder0(nn.Module):
+class JointAutoencoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
         self.latent_dim = latent_dim
-        self.encoder = SkipEncoder0(latent_dim)
-        self.decoder = SkipDecoder0(latent_dim)
+        self.encoder = JointEncoder0(latent_dim)
+        self.decoder = JointDecoder0(latent_dim)
 
     def forward(self, x):
-        z, skip1, skip2 = self.encoder(x)
-        out = self.decoder(z, skip1, skip2)
+        z, Joint1, Joint2 = self.encoder(x)
+        out = self.decoder(z, Joint1, Joint2)
         return out
 
 #################################
-class SkipEncoder1(nn.Module):
+class JointEncoder1(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
@@ -106,7 +106,7 @@ class SkipEncoder1(nn.Module):
         z = self.fc(x)              # (B, LATENT_DIMS[1])
         return z, x1, x2, x3, x4
 
-class SkipDecoder1(nn.Module):
+class JointDecoder1(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
@@ -126,27 +126,27 @@ class SkipDecoder1(nn.Module):
         x = x.view(-1, 32, 16, 16)           # (B, 32, 16, 16)
 
         x = F.relu(self.conv1(x))            # (B, 32, 16, 16)
-        x = x + x4                        # Skip connection
+        x = x + x4                        # Joint connection
         x = F.relu(self.conv2(x))            # (B, 64, 16, 16)
         x = self.upsample(x)                 # (B, 64, 32, 32)
-        x = x + x3                        # Skip connection
+        x = x + x3                        # Joint connection
 
         x = F.relu(self.conv3(x))            # (B, 8, 32, 32)
         x = self.upsample(x)                 # (B, 8, 64, 64)
-        x = x + x2                        # Skip connection
+        x = x + x2                        # Joint connection
         x = F.relu(self.conv4(x))            # (B, 32, 64, 64)
         x = self.upsample(x)                 # (B, 32, 128, 128)
-        x = x + x1                        # Skip connection
+        x = x + x1                        # Joint connection
         x = self.conv5(x)                    # (B, 3, 128, 128)
 
         return x
     
-class SkipAutoencoder1(nn.Module):
+class JointAutoencoder1(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
-        self.encoder = SkipEncoder1(latent_dim)
-        self.decoder = SkipDecoder1(latent_dim)
+        self.encoder = JointEncoder1(latent_dim)
+        self.decoder = JointDecoder1(latent_dim)
 
     def forward(self, x):
         z, x1, x2, x3, x4 = self.encoder(x)
