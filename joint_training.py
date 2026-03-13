@@ -160,17 +160,17 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
             x = x.to(device)
             y = y.to(device)
 
-            recon0, _, _ = joint_0(x)
-            recon1, _, _ = joint_1(x)
-
             z0 = joint_0.encoder(x)
+            recon0 = joint_0.decoder(z0)
+
             z1 = joint_1.encoder(x)
+            recon1 = joint_1.decoder(z1)
 
             loss = combined_loss(
                 recon0,
                 recon1,
-                z0,
-                z1,
+                z0[0],
+                z1[0],
                 y,
                 mse_weight,
                 ssim_weight,
@@ -213,8 +213,8 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
                 val_loss = combined_loss(
                     recon0,
                     recon1,
-                    z0,
-                    z1,
+                    z0[0],
+                    z1[0],
                     y,
                     mse_weight,
                     ssim_weight,
