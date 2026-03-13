@@ -11,17 +11,30 @@ def ssim_loss(recon_x, x):
 
 
 # Função que calcula a distância euclidiana entre os embeddings de dois clusters
-# 0 -> são iguais
-# 1 -> são completamente diferentes
-# como quero variar, faço -1 para inverter a escala
 def euclidean_distance_loss(cluster_a, cluster_b):
-    # Calcula a distância por amostra no batch
-    batch_size = cluster_a.shape[0]
-    distances = []
-    for i in range(batch_size):
-        dist = torch.dist(cluster_a[i].flatten(), cluster_b[i].flatten())
-        distances.append(dist)
-    mean_distance = torch.stack(distances).mean()
-    
-    normalized = mean_distance / 2
-    return -1 - normalized
+
+    a = cluster_a.view(cluster_a.size(0), -1)
+    b = cluster_b.view(cluster_b.size(0), -1)
+
+    distances = torch.norm(a - b, dim=1)
+
+    mean_distance = distances.mean()
+
+    normalized = torch.tanh(mean_distance)
+
+    return -normalized
+
+
+def orthogonal_loss(z0, z1):
+
+    z0 = z0.view(z0.size(0), -1)
+    z1 = z1.view(z1.size(0), -1)
+
+    z0 = F.normalize(z0, dim=1)
+    z1 = F.normalize(z1, dim=1)
+
+    cosine = (z0 * z1).sum(dim=1)
+
+    loss = (cosine ** 2).mean()
+
+    return loss
