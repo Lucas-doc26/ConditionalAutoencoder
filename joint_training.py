@@ -1,22 +1,17 @@
 import pandas as pd 
 from src.utils.datasets import CustomImageDataset
 
-from tqdm import tqdm
 import torch 
 from torch.utils.data import DataLoader
 import torch.nn as nn
 
-import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 
-from sklearn.metrics import accuracy_score
 
-from src.models.classifier import Classifier
 from src.models.joint_autoencoder import JointAutoencoder0, JointAutoencoder1
 from src.config.config import Config
 from src.utils.plot import plot_reconstruction
 
-import torch.nn.init as init
 
 #ref: https://www.codegenes.net/blog/how-to-do-joint-training-on-many-models-pytorch/
 
@@ -42,7 +37,54 @@ joint_1.to(device)
 criterion_model_0 = nn.MSELoss()
 criterion_model_1 = nn.MSELoss()
 
-from src.models.loss.autoencoder_loss import ssim_loss, euclidean_distance_loss, orthogonal_loss
+from src.models.loss.autoencoder_loss import ssim_loss, orthogonal_loss
+from sklearn.metrics.pairwise import euclidean_distances
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+
+import os
+
+def plot_cluster(representations0, representations1, y_true, save_path):
+
+    rep0 = torch.cat(representations0).cpu().numpy()
+    rep1 = torch.cat(representations1).cpu().numpy()
+
+    # juntar representações
+    rep_all = np.concatenate([rep0, rep1], axis=0)
+
+    # reduzir para 2D usando PCA
+    pca = PCA(n_components=2)
+    rep_all_2d = pca.fit_transform(rep_all)
+
+    # separar novamente
+    n = rep0.shape[0]
+    rep0_2d = rep_all_2d[:n]
+    rep1_2d = rep_all_2d[n:]
+
+    # distância entre representações
+    dist_matrix = euclidean_distances(rep0_2d, rep1_2d)
+    mean_distance = dist_matrix.mean()
+
+    plt.figure(figsize=(8,8))
+
+    plt.scatter(rep0_2d[:,0], rep0_2d[:,1],
+                c=y_true, cmap="tab10",
+                marker="o", label="Encoder0", alpha=0.7)
+
+    plt.scatter(rep1_2d[:,0], rep1_2d[:,1],
+                c=y_true, cmap="tab10",
+                marker="x", label="Encoder1", alpha=0.7)
+
+    plt.legend()
+    plt.title("PCA comparison of encoder representations")
+    plt.savefig(save_path)
+    plt.close()
+
+    return mean_distance
+
+
  
 def combined_loss(output_model_0,
                   output_model_1,
@@ -101,7 +143,7 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
             torch.nn.utils.clip_grad_norm_(parameters, max_norm=1.0)
             optimizer.step()
         
-        epoch_loss = running_loss / len(train_loader)
+        running_loss / len(train_loader)
         scheduler.step()
         
         joint_0.eval()
@@ -137,7 +179,26 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
     plot_reconstruction(x, recon0, title0, "PUC", save_path='./results/Joint-Grid-Search')
     plot_reconstruction(x, recon1, title1, "PUC", save_path='./results/Joint-Grid-Search')
     
-    return val_epoch_loss
+    representations0 = []
+    representations1 = []
+    y_true = pd.read_csv("/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/batches/batch-1024.csv")['class'].to_list()
+    
+    for img, label, idx in test_loader:
+        img = img.to(device)
+
+        with torch.no_grad():
+            recon0 = joint_0(x)
+            recon1 = joint_1(x)
+
+        representations0.append(recon0.cpu())
+        representations1.append(recon1.cpu())
+        y_true.extend(label.cpu().numpy())
+        
+    os.makedirs("./results/Joint-Grid-Search/Clusters/", exist_ok=True)
+    mean_distance = plot_cluster(representations0, representations1, y_true, f"./results/Joint-Grid-Search/Clusters/MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}.png")
+    
+    
+    return val_epoch_loss, mean_distance
 
 mse_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
 ssim_weights = [0.2, 0.3, 0.4, 0.5, 0.6]
@@ -148,15 +209,14 @@ results = []
 for mse_w in mse_weights:
     for ssim_w in ssim_weights:
         for rec in rec_weights:
-            val_loss = train_models(mse_w, ssim_w, rec)
-            results.append((mse_w, ssim_w, rec, val_loss))
-            print(f'MSE: {mse_w}, SSIM: {ssim_w}, REC: {rec} Val Loss: {val_loss:.4f}')
+            val_loss, mean_distance = train_models(mse_w, ssim_w, rec)
+            results.append((mse_w, ssim_w, rec, val_loss, mean_distance))
+            print(f'MSE: {mse_w}, SSIM: {ssim_w}, REC: {rec} Val Loss: {val_loss:.4f}, Mean Distance: {mean_distance:.4f}')
 
-# Save results to CSV
 import csv
 with open('grid_search_results.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(['MSE_Weight', 'SSIM_Weight', "rec_weights", 'Val_Loss'])
+    writer.writerow(['MSE_Weight', 'SSIM_Weight', "rec_weights", 'Val_Loss',"mean_distance"])
     for row in results:
         writer.writerow(row)
 

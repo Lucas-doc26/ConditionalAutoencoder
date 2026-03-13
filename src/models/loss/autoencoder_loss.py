@@ -1,8 +1,6 @@
 from src.utils.image_metrics import calculate_ssim_torch
-import numpy as np
 import torch
 import torch.nn.functional as F
-from sklearn.metrics.pairwise import euclidean_distances
 
 
 def ssim_loss(recon_x, x):

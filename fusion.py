@@ -244,7 +244,6 @@ def run_all_fusions():
                                 "tipo_encoder": type_of_encoder,
                                 "dataset_train": dataset_train,
                                 "dataset_encoder": dataset_encoder,
-                                "dataset_train": dataset_train,
                                 "dataset_test": dataset_test,
                                 "batch": batch,
                                 "tecnica_fusao": name,
