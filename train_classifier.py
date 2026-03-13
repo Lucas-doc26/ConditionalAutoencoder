@@ -372,11 +372,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ENCODERS = [
-        Encoder9
+        Encoder0, Encoder1, Encoder2, Encoder3, Encoder4,
+        Encoder5, Encoder6, Encoder7, Encoder8, Encoder9
     ]
 
     SKIP_ENCODERS = [
-        SkipEncoder9
+        SkipEncoder0, SkipEncoder1, SkipEncoder2, SkipEncoder3, SkipEncoder4,
+        SkipEncoder5, SkipEncoder6, SkipEncoder7, SkipEncoder8, SkipEncoder9
     ]
 
     VAE_ENCODERS = [
