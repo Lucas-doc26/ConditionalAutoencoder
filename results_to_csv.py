@@ -8,7 +8,7 @@ dataframe_final = pd.DataFrame()
 
 for type in ["AE", "Skip"]:
     EXPERIMENT_NAME = f"Classifier_{type}_0"
-    OUTPUT_CSV = "metrics_classifiers_0.csv"
+    OUTPUT_CSV = "metrics_classifiers_1.csv"
 
     mlflow.set_tracking_uri(Config.IP_LOCAL)
 

@@ -34,7 +34,8 @@ valid = CustomImageDataset(
 
 test = CustomImageDataset(
     csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/PUC_test.csv",
-    autoencoder=True
+    autoencoder=True,
+    data_limit=200
 )
 
 train_loader = DataLoader(train, batch_size=32, shuffle=True)
@@ -138,7 +139,7 @@ def combined_loss(
 # TRAIN
 # ======================
 
-def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
+def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
 
     joint_0 = JointAutoencoder0().to(device)
     joint_1 = JointAutoencoder1().to(device)
@@ -161,10 +162,10 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
             y = y.to(device)
 
             z0 = joint_0.encoder(x)
-            recon0 = joint_0.decoder(z0)
+            recon0 = joint_0.decoder(*z0)
 
             z1 = joint_1.encoder(x)
-            recon1 = joint_1.decoder(z1)
+            recon1 = joint_1.decoder(*z1)
 
             loss = combined_loss(
                 recon0,
@@ -282,8 +283,8 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=100):
             z0 = joint_0.encoder(img)
             z1 = joint_1.encoder(img)
 
-            representations0.append(z0.cpu())
-            representations1.append(z1.cpu())
+            representations0.append(z0[0].cpu())
+            representations1.append(z1[0].cpu())
 
             y_true.extend(label.numpy())
 

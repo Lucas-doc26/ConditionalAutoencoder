@@ -5,8 +5,9 @@ import numpy as np
 from .transform import return_transform
 
 class CustomImageDataset(Dataset): 
-    def __init__(self, csv, transform=True, autoencoder=True): 
+    def __init__(self, csv, transform=True, autoencoder=True, data_limit=None): 
         self.df = pd.read_csv(csv) 
+        self.df = self.df if data_limit == None else self.df[int(data_limit):] 
         self.transform = return_transform() if transform else None
         self.autoencoder = autoencoder 
 

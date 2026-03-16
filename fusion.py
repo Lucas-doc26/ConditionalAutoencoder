@@ -131,7 +131,7 @@ def run_all_fusions():
         "{dataset_test}/outputs.npz"
     )
 
-    type_of_encoders = ["Encoder", "SkipEncoder", "VariationalEncoder"]
+    type_of_encoders = ["Encoder", "SkipEncoder"]
     dataset_encoders = ["CNR", 'PKLot']
     datasets_train = ["camera1","camera2","camera3","camera4","camera5",
         "camera6","camera7","camera8","camera9",
