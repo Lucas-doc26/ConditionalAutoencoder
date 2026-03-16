@@ -17,6 +17,7 @@ from src.config.config import Config
 from src.utils.plot import plot_reconstruction
 from src.models.loss.autoencoder_loss import ssim_loss, orthogonal_loss
 
+from torch.cuda.amp import autocast
 
 # ======================
 # DATASETS
@@ -163,9 +164,10 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
 
             z0 = joint_0.encoder(x)
             recon0 = joint_0.decoder(*z0)
+            
 
             z1 = joint_1.encoder(x)
-            recon1 = joint_1.decoder(*z1)
+            recon0 = joint_1.decoder(*z1)
 
             loss = combined_loss(
                 recon0,
