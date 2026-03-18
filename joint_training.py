@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import os
 import csv
 
+from tqdm import tqdm
+
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR
 from sklearn.decomposition import PCA
@@ -19,44 +21,35 @@ from src.models.loss.autoencoder_loss import ssim_loss, orthogonal_loss
 
 from torch.cuda.amp import autocast
 
-# ======================
-# DATASETS
-# ======================
 
 train = CustomImageDataset(
-    csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/batches/batch-1024.csv",
+    csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/UFPR04/batches/batch-1024.csv",
     autoencoder=True
 )
 
 valid = CustomImageDataset(
-    csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/PUC_validation.csv",
+    csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/UFPR04/UFPR04_validation.csv",
     autoencoder=True
 )
 
 test = CustomImageDataset(
-    csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/PUC/PUC_test.csv",
-    autoencoder=True,
-    data_limit=200
+    csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/UFPR04/UFPR04_test.csv",
+    autoencoder=False,
+    data_per_class=200
 )
+
 
 train_loader = DataLoader(train, batch_size=32, shuffle=True)
 valid_loader = DataLoader(valid, batch_size=32, shuffle=False)
 test_loader = DataLoader(test, batch_size=32, shuffle=False)
 
 
-# ======================
-# CONFIG
-# ======================
 
 config = Config()
 device = config.DEVICE0
 
 criterion = nn.MSELoss()
 
-
-# ======================
-# PLOT CLUSTER
-# ======================
 
 def plot_cluster(representations0, representations1, y_true, save_path):
 
@@ -71,6 +64,8 @@ def plot_cluster(representations0, representations1, y_true, save_path):
     n = rep0.shape[0]
     rep0_2d = rep_all_2d[:n]
     rep1_2d = rep_all_2d[n:]
+
+    y_true = y_true[:n]
 
     dist_matrix = euclidean_distances(rep0_2d, rep1_2d)
     mean_distance = dist_matrix.mean()
@@ -89,7 +84,7 @@ def plot_cluster(representations0, representations1, y_true, save_path):
     plt.scatter(
         rep1_2d[:,0], rep1_2d[:,1],
         c=y_true,
-        cmap="tab10",
+        cmap="Set1",
         marker="x",
         label="Encoder1",
         alpha=0.7
@@ -103,9 +98,7 @@ def plot_cluster(representations0, representations1, y_true, save_path):
     return mean_distance
 
 
-# ======================
 # LOSS
-# ======================
 
 def combined_loss(
     recon0,
@@ -136,11 +129,9 @@ def combined_loss(
     return total_loss
 
 
-# ======================
 # TRAIN
-# ======================
 
-def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
+def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=50):
 
     joint_0 = JointAutoencoder0().to(device)
     joint_1 = JointAutoencoder1().to(device)
@@ -163,17 +154,26 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
             y = y.to(device)
 
             z0 = joint_0.encoder(x)
-            recon0 = joint_0.decoder(*z0)
+            if len(z0) == 3 :
+                recon0 = joint_0.decoder(*z0)
+            else: 
+                recon0 = joint_0.decoder(z0)
             
 
             z1 = joint_1.encoder(x)
-            recon0 = joint_1.decoder(*z1)
+            if len(z1) == 3:
+                recon1 = joint_1.decoder(*z1)
+            else:
+                recon1 = joint_1.decoder(z1)
+            
+
+            
 
             loss = combined_loss(
                 recon0,
                 recon1,
-                z0[0],
-                z1[0],
+                z0,
+                z1,
                 y,
                 mse_weight,
                 ssim_weight,
@@ -216,8 +216,8 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
                 val_loss = combined_loss(
                     recon0,
                     recon1,
-                    z0[0],
-                    z1[0],
+                    z0,
+                    z1,
                     y,
                     mse_weight,
                     ssim_weight,
@@ -229,10 +229,8 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
         val_epoch_loss = running_val_loss / len(valid_loader)
 
 
-    # ======================
-    # RECONSTRUCTION PLOTS
-    # ======================
-
+        # RECONSTRUCTION PLOTS
+    
     joint_0.eval()
     joint_1.eval()
 
@@ -268,25 +266,23 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
     )
 
 
-    # ======================
-    # CLUSTER REPRESENTATIONS
-    # ======================
-
+        # CLUSTER REPRESENTATIONS
+    
     representations0 = []
     representations1 = []
     y_true = []
 
     with torch.no_grad():
 
-        for img, label, _ in test_loader:
+        for img, label, _ in tqdm(test_loader, desc='CLUSTER'):
 
             img = img.to(device)
 
             z0 = joint_0.encoder(img)
             z1 = joint_1.encoder(img)
 
-            representations0.append(z0[0].cpu())
-            representations1.append(z1[0].cpu())
+            representations0.append(z0.cpu())
+            representations1.append(z1.cpu())
 
             y_true.extend(label.numpy())
 
@@ -307,9 +303,7 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=10):
     return val_epoch_loss, mean_distance
 
 
-# ======================
 # GRID SEARCH
-# ======================
 
 mse_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
 ssim_weights = [0.2, 0.3, 0.4, 0.5, 0.6]
@@ -337,9 +331,7 @@ for mse_w in mse_weights:
             )
 
 
-# ======================
 # SAVE RESULTS
-# ======================
 
 with open("grid_search_results.csv", "w", newline="") as csvfile:
 
