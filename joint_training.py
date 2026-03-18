@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import os
 import csv
 
+import mlflow
+
 from tqdm import tqdm
 
 from torch.utils.data import DataLoader
@@ -18,9 +20,6 @@ from src.models.joint_autoencoder import JointAutoencoder0, JointAutoencoder1
 from src.config.config import Config
 from src.utils.plot import plot_reconstruction
 from src.models.loss.autoencoder_loss import ssim_loss, orthogonal_loss
-
-from torch.cuda.amp import autocast
-
 
 train = CustomImageDataset(
     csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/UFPR04/batches/batch-1024.csv",
@@ -129,91 +128,55 @@ def combined_loss(
     return total_loss
 
 
-# TRAIN
 
 def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=50):
 
-    joint_0 = JointAutoencoder0().to(device)
-    joint_1 = JointAutoencoder1().to(device)
+    
+    mlflow.set_experiment("JointAutoencoder-Testes")
+    title =  f"MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}"
+    title0 = f"JointAutoencoder0{title}"
+    title1 = f"JointAutoencoder1{title}"
+    
+    with mlflow.start_run(run_name=title):
+        
+        mlflow.log_param("mse_weight", mse_weight)
+        mlflow.log_param("ssim_weight", ssim_weight)
+        mlflow.log_param("rec_weight", rec_weight)
+        
+        joint_0 = JointAutoencoder0().to(device)
+        joint_1 = JointAutoencoder1().to(device)
 
-    parameters = list(joint_0.parameters()) + list(joint_1.parameters())
+        parameters = list(joint_0.parameters()) + list(joint_1.parameters())
 
-    optimizer = torch.optim.Adam(parameters)
-    scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
+        optimizer = torch.optim.Adam(parameters)
+        scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
 
-    for epoch in range(num_epochs):
+        for epoch in range(num_epochs):
 
-        joint_0.train()
-        joint_1.train()
+            joint_0.train()
+            joint_1.train()
 
-        running_loss = 0.0
+            running_loss = 0.0
 
-        for x, y, _ in train_loader:
-
-            x = x.to(device)
-            y = y.to(device)
-
-            z0 = joint_0.encoder(x)
-            if len(z0) == 3 :
-                recon0 = joint_0.decoder(*z0)
-            else: 
-                recon0 = joint_0.decoder(z0)
-            
-
-            z1 = joint_1.encoder(x)
-            if len(z1) == 3:
-                recon1 = joint_1.decoder(*z1)
-            else:
-                recon1 = joint_1.decoder(z1)
-            
-
-            
-
-            loss = combined_loss(
-                recon0,
-                recon1,
-                z0,
-                z1,
-                y,
-                mse_weight,
-                ssim_weight,
-                rec_weight
-            )
-
-            optimizer.zero_grad()
-            loss.backward()
-
-            torch.nn.utils.clip_grad_norm_(parameters, 1.0)
-
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        running_loss /= len(train_loader)
-
-        scheduler.step()
-
-        # validation
-
-        joint_0.eval()
-        joint_1.eval()
-
-        running_val_loss = 0.0
-
-        with torch.no_grad():
-
-            for x, y, _ in valid_loader:
+            for x, y, _ in train_loader:
 
                 x = x.to(device)
                 y = y.to(device)
 
-                recon0 = joint_0(x)
-                recon1 = joint_1(x)
-
                 z0 = joint_0.encoder(x)
-                z1 = joint_1.encoder(x)
+                if len(z0) == 3 :
+                    recon0 = joint_0.decoder(*z0)
+                else: 
+                    recon0 = joint_0.decoder(z0)
+                
 
-                val_loss = combined_loss(
+                z1 = joint_1.encoder(x)
+                if len(z1) == 3:
+                    recon1 = joint_1.decoder(*z1)
+                else:
+                    recon1 = joint_1.decoder(z1)
+
+                loss = combined_loss(
                     recon0,
                     recon1,
                     z0,
@@ -224,89 +187,145 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=50):
                     rec_weight
                 )
 
-                running_val_loss += val_loss.item()
+                optimizer.zero_grad()
+                loss.backward()
 
-        val_epoch_loss = running_val_loss / len(valid_loader)
+                torch.nn.utils.clip_grad_norm_(parameters, 1.0)
 
+                optimizer.step()
 
-        # RECONSTRUCTION PLOTS
-    
-    joint_0.eval()
-    joint_1.eval()
+                running_loss += loss.item()
 
-    with torch.no_grad():
-
-        for x, _, _ in test_loader:
-
-            x = x[:8].to(device)
-
-            recon0 = joint_0(x)
-            recon1 = joint_1(x)
-
-            break
+            running_loss /= len(train_loader)
+            mlflow.log_metric("train_loss", running_loss, step=epoch)
 
 
-    title0 = f"JointAutoencoder0_MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}"
-    title1 = f"JointAutoencoder1_MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}"
+            scheduler.step()
 
-    plot_reconstruction(
-        x,
-        recon0,
-        title0,
-        "PUC",
-        save_path="./results/Joint-Grid-Search"
-    )
+            # validation
 
-    plot_reconstruction(
-        x,
-        recon1,
-        title1,
-        "PUC",
-        save_path="./results/Joint-Grid-Search"
-    )
+            joint_0.eval()
+            joint_1.eval()
 
+            running_val_loss = 0.0
 
-        # CLUSTER REPRESENTATIONS
-    
-    representations0 = []
-    representations1 = []
-    y_true = []
+            with torch.no_grad():
 
-    with torch.no_grad():
+                for x, y, _ in valid_loader:
 
-        for img, label, _ in tqdm(test_loader, desc='CLUSTER'):
+                    x = x.to(device)
+                    y = y.to(device)
 
-            img = img.to(device)
+                    recon0 = joint_0(x)
+                    recon1 = joint_1(x)
 
-            z0 = joint_0.encoder(img)
-            z1 = joint_1.encoder(img)
+                    z0 = joint_0.encoder(x)
+                    z1 = joint_1.encoder(x)
 
-            representations0.append(z0.cpu())
-            representations1.append(z1.cpu())
+                    val_loss = combined_loss(
+                        recon0,
+                        recon1,
+                        z0,
+                        z1,
+                        y,
+                        mse_weight,
+                        ssim_weight,
+                        rec_weight
+                    )
 
-            y_true.extend(label.numpy())
+                    running_val_loss += val_loss.item()
+
+            val_epoch_loss = running_val_loss / len(valid_loader)
 
 
-    os.makedirs("./results/Joint-Grid-Search/Clusters/", exist_ok=True)
+            # RECONSTRUCTION PLOTS
+        
+        joint_0.eval()
+        joint_1.eval()
 
-    mean_distance = plot_cluster(
-        representations0,
-        representations1,
-        y_true,
-        f"./results/Joint-Grid-Search/Clusters/MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}.png"
-    )
+        with torch.no_grad():
 
-    del joint_0
-    del joint_1
-    torch.cuda.empty_cache()
+            for x, _, _ in test_loader:
 
-    return val_epoch_loss, mean_distance
+                x = x[:8].to(device)
+
+                recon0 = joint_0(x)
+                recon1 = joint_1(x)
+
+                break
+
+
+        
+
+        rec0 = plot_reconstruction(
+            x,
+            recon0,
+            title0,
+            "PUC",
+            save_path="./results/Joint-Grid-Search"
+        )
+
+        rec1 = plot_reconstruction(
+            x,
+            recon1,
+            title1,
+            "PUC",
+            save_path="./results/Joint-Grid-Search"
+        )
+
+
+            # CLUSTER REPRESENTATIONS
+        
+        representations0 = []
+        representations1 = []
+        y_true = []
+
+        with torch.no_grad():
+
+            for img, label, _ in tqdm(test_loader, desc='CLUSTER'):
+
+                img = img.to(device)
+
+                z0 = joint_0.encoder(img)
+                z1 = joint_1.encoder(img)
+
+                representations0.append(z0.cpu())
+                representations1.append(z1.cpu())
+
+                y_true.extend(label.numpy())
+
+
+        os.makedirs("./results/Joint-Grid-Search/Clusters/", exist_ok=True)
+
+        path_cluster = f'./results/Joint-Grid-Search/Clusters/MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}.png'
+        mean_distance = plot_cluster(
+            representations0,
+            representations1,
+            y_true,
+            path_cluster
+        )
+
+        del joint_0
+        del joint_1
+        torch.cuda.empty_cache()
+        
+        mlflow.log_artifact(rec0, artifact_path="reconstructions")
+        mlflow.log_artifact(rec1, artifact_path="reconstructions")
+        mlflow.log_artifact(path_cluster, artifact_path="cluster")
+        mlflow.log_metric('val_loss', val_epoch_loss)
+        mlflow.log_metric('mean_distance', mean_distance)
+
+
+        return val_epoch_loss, mean_distance
+
+
+
 
 
 # GRID SEARCH
 
 mse_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
-ssim_weights = [0.2, 0.3, 0.4, 0.5, 0.6]
+ssim_weights = [0.0, 0.2, 0.3, 0.4, 0.5, 0.6]
 rec_weights = [0.3, 0.5, 0.7, 1.0]
 
 results = []
