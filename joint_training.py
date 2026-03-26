@@ -121,7 +121,7 @@ def combined_loss(
 
     reconstruction_loss = (rec0 + rec1) / 2
 
-    ort_loss = orthogonal_loss(z0, z1)
+    ort_loss = orthogonal_loss([z0, z1])
 
     total_loss = reconstruction_loss + rec_weight * ort_loss
 
@@ -132,7 +132,7 @@ def combined_loss(
 def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=50):
 
     
-    mlflow.set_experiment("JointAutoencoder-Testes")
+    mlflow.set_experiment("JointAutoencoder-Testes-2")
     title =  f"MSE{mse_weight}_SSIM{ssim_weight}_REC{rec_weight}"
     title0 = f"JointAutoencoder0{title}"
     title1 = f"JointAutoencoder1{title}"
@@ -254,9 +254,6 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=50):
 
                 break
 
-
-        
-
         rec0 = plot_reconstruction(
             x,
             recon0,
@@ -323,7 +320,7 @@ def train_models(mse_weight, ssim_weight, rec_weight, num_epochs=50):
 
 
 # GRID SEARCH
-
+mlflow.set_tracking_uri(Config().IP_LOCAL)
 mse_weights = [0.4, 0.5, 0.6, 0.7, 0.8]
 ssim_weights = [0.0, 0.2, 0.3, 0.4, 0.5, 0.6]
 rec_weights = [0.3, 0.5, 0.7, 1.0]
