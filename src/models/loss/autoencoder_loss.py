@@ -23,7 +23,9 @@ def euclidean_distance_loss(cluster_a, cluster_b):
     return -normalized
 
 
-"""def orthogonal_loss(z0, z1):
+
+#aqui, cada amostra é compara uma a uma -> z0[N] contra z1[N]
+def orthogonal_loss_dual_input(z0, z1):
 
     z0 = z0.view(z0.size(0), -1)
     z1 = z1.view(z1.size(0), -1)
@@ -35,20 +37,21 @@ def euclidean_distance_loss(cluster_a, cluster_b):
 
     loss = (cosine ** 2).mean()
 
-    return loss"""
+    return loss
 
-#v2
 def orthogonal_loss(embeddings: list):
-    """
-    Abordagem matricial: O(K²D) em vez de O(K² * chamadas)
-    """
-    # Stack: (K, B, D) → média no batch → (K, D)
+    #(K, B, D) → normaliza e tira a média no batch → (K, D)
     zs = torch.stack([
         F.normalize(z.view(z.size(0), -1), dim=1).mean(dim=0) 
         for z in embeddings
     ])  # (K, D)
     
     gram = zs @ zs.T          # (K, K) — produto interno entre todas as labels
-    I = torch.eye(len(embeddings), device=gram.device)
-    loss = (gram - I).pow(2).sum()  # penaliza off-diagonal
+    I = torch.eye(len(embeddings), device=gram.device) #identidade 
+    loss = (gram - I).pow(2).sum()  #Subtrai identidade e penaliza os elementos fora da diagonal (loss off-diagonal)
+    #penaliza as semelhanças entre os diferentes clusters, forçando elas a ficarem ortogonais (distantes)
+    #ao calcular a matriz gram -> a diagonal é a parte que existe semelhança entre os dados do mesmo cluster 
+    # a parte fora da diagonal é a similaridade entre os diferentes clusters -> ao fazer gram - I -> penalizo somente a parte de fora
+    #que faz os diferentes clusters se afastarem 
+    
     return loss
