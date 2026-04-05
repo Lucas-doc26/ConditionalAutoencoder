@@ -1,12 +1,19 @@
 import os
-import csv
+import random
 import numpy as np
 import pandas as pd
-from scipy.special import softmax
 from collections import Counter
-from sklearn.metrics import accuracy_score, precision_score
-from itertools import combinations
+from sklearn.metrics import accuracy_score
+from itertools import combinations, product
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+import threading
+import logging
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────── fusion methods ───────────────────────────────────
 
 def fusion_sum(stacked):
     agg = np.sum(stacked, axis=0)
@@ -32,7 +39,7 @@ def fusion_mult(stacked):
 
 def fusion_vote(stacked):
     n_models, N, C = stacked.shape
-    preds_models = np.argmax(stacked, axis=2)
+    preds_models = np.argmax(stacked, axis=2)  # [M, N]
     final_preds = np.zeros(N, dtype=np.int64)
 
     for i in range(N):
@@ -41,135 +48,202 @@ def fusion_vote(stacked):
         top = counts.most_common()
         max_votes = top[0][1]
         tied = [cls for cls, cnt in top if cnt == max_votes]
-
         if len(tied) == 1:
             final_preds[i] = tied[0]
         else:
             probs_sum = np.sum(stacked[:, i, :], axis=0)
             final_preds[i] = max(tied, key=lambda c: probs_sum[c])
 
-    probs = np.eye(C)[final_preds]
-    return probs.astype(np.float32)
+    return np.eye(C, dtype=np.float32)[final_preds]
 
 
-nums = list(range(10))
-
-
-def stack_predictions(models_outputs):
-    # models_outputs: lista de arrays [N, C]
-
-    stacked = np.stack(models_outputs, axis=0)  # [M, N, C]
-
-    return stacked
-
-
-def check_all_models_npy_same_length(path_npy_template, n_models=10):
-    """
-    Verifica se todos os arquivos batches-*.npy dos modelos 0..n_models-1
-    existem e têm o mesmo número de linhas (amostras).
-    Retorna (ok, info): info é {model_id: n_samples} ou {"error": "..."}.
-    """
-    lengths = {}
-    for i in range(n_models):
-        p = path_npy_template.replace("Z", str(i))
-        if not os.path.isfile(p):
-            return False, {"error": f"arquivo ausente: {p}"}
-        arr = np.load(p, mmap_mode="r")
-        lengths[i] = int(arr.shape[0])
-    if len(set(lengths.values())) != 1:
-        return False, lengths
-    return True, lengths
-
-
-def make_fusion(n_models, path_npy, y_true):
-
-    results = {}
-    
-    combinacoes = list(combinations(nums, n_models))
-    for comb in combinacoes:
-        stacked = []
-        for n_model in comb:
-            npy = np.load(path_npy.replace('Z', str(n_model)))
-            stacked.append(npy)
-        stacked_preds = stack_predictions(stacked)
-        
-        accuracy_score_dict = {}
-        for name_func, func in fusion_methods.items():
-            y_pred = func(stacked_preds)
-            y_pred = np.argmax(y_pred, axis=1)
-            accuracy_score_dict[name_func] = accuracy_score(y_true, y_pred)
-        results[comb] = accuracy_score_dict    
-    
-    return results
-
-fusion_methods = {
+FUSION_METHODS = {
     "sum": fusion_sum,
     "mean_probs": fusion_mean,
     "max": fusion_max,
     "mult": fusion_mult,
-    "vote": fusion_vote
+    "vote": fusion_vote,
 }
 
-dict_combinations = {
-    #"PKLot": ['camera1', 'camera2', 'camera3', 'camera4', 'camera5', 'camera6', 'camera7', 'camera8', 'camera9'],
-    "CNR": ['UFPR04', 'UFPR05', 'PUC'],
-    'Kyoto': ['UFPR04', 'UFPR05', 'PUC', 'camera1', 'camera2', 'camera3', 'camera4', 'camera5', 'camera6', 'camera7', 'camera8', 'camera9']
+# ─────────────────────────── constants ────────────────────────────────────────
+
+N_MODELS_TOTAL = 10
+ALL_MODEL_IDS   = list(range(N_MODELS_TOTAL))
+
+DICT_COMBINATIONS = {
+    "PKLot": ['camera1', 'camera2', 'camera3', 'camera4', 'camera5',
+              'camera6', 'camera7', 'camera8', 'camera9'],
+    "CNR":   ['UFPR04', 'UFPR05', 'PUC'],
+    "Kyoto": ['UFPR04', 'UFPR05', 'PUC',
+              'camera1', 'camera2', 'camera3', 'camera4', 'camera5',
+              'camera6', 'camera7', 'camera8', 'camera9'],
 }
 
-testes = ['UFPR04', 'UFPR05', 'PUC', 'camera1', 'camera2', 'camera3', 'camera4', 'camera5', 'camera6', 'camera7', 'camera8', 'camera9']
-batches = [64, 128, 256, 512, 1024]
+TESTES  = ['UFPR04', 'UFPR05', 'PUC',
+           'camera1', 'camera2', 'camera3', 'camera4', 'camera5',
+           'camera6', 'camera7', 'camera8', 'camera9']
+BATCHES = [64, 128, 256, 512, 1024]
+
+BASE_MODEL_DIR = "/home/lucas.ocunha/Downloads/PIBIC-ANO-PASSADO/Modelos"
+BASE_CSV_DIR   = "/home/lucas.ocunha/Downloads/PIBIC-ANO-PASSADO/CSV"
+OUT_DIR        = "/home/lucas.ocunha/ConditionalAutoencoder/resultados_pibic_ano_passado"
+
+# ─────────────────────────── helpers ──────────────────────────────────────────
+
+def npy_path(encoder, classificador, teste, batch, model_id):
+    return (
+        f"{BASE_MODEL_DIR}/Modelo_Kyoto-{model_id}/"
+        f"Classificador-{encoder}/Resultados/"
+        f"Treinados_em_{classificador}/{teste}/batches-{batch}.npy"
+    )
 
 
-rows = []
+def check_and_load_arrays(encoder, classificador, teste, batch):
+    """
+    Loads all 10 model arrays for a given task.
+    Returns (arrays_dict, n_samples) or raises RuntimeError with a reason.
+    """
+    arrays = {}
+    n_samples_set = set()
 
-for encoder, classificadores in dict_combinations.items():
-    print(encoder)
-    for classificador in classificadores:
-        for teste in testes:                    
-            for batch in batches:
-                path_numpy_dir = f'/home/lucas/representation-fusion/Modelos/Modelo_Kyoto-0/Classificador-{encoder}/Resultados/Treinados_em_{classificador}/{teste}'
-                if os.path.isdir(path_numpy_dir):
+    for mid in ALL_MODEL_IDS:
+        p = npy_path(encoder, classificador, teste, batch, mid)
+        if not os.path.isfile(p):
+            raise FileNotFoundError(f"Missing: {p}")
+        arr = np.load(p)          # load fully once; faster than mmap for repeated access
+        arrays[mid] = arr.astype(np.float32, copy=False)
+        n_samples_set.add(arr.shape[0])
 
-                    path_npy = f'/home/lucas/representation-fusion/Modelos/Modelo_Kyoto-Z/Classificador-{encoder}/Resultados/Treinados_em_{classificador}/{teste}/batches-{batch}.npy'
-                    ok_lens, lens = check_all_models_npy_same_length(path_npy)
-                    if not ok_lens:
-                        print(
-                            f"[skip] tamanhos .npy inconsistentes ou faltando — "
-                            f"encoder={encoder} classificador={classificador} teste={teste} batch={batch} | {lens}"
-                        )
-                        continue
+    if len(n_samples_set) != 1:
+        raise ValueError(f"Inconsistent sample counts: {n_samples_set}")
 
-                    y_true1 = pd.read_csv(f'/home/lucas/representation-fusion/CSV_antigo/{teste}/{teste}_test.csv')['class']
-                    y_true2 = pd.read_csv(f'/home/lucas/representation-fusion/CSV_antigo/{teste}/{teste}.csv')['class']
+    return arrays, next(iter(n_samples_set))
 
-                    n_samples = int(next(iter(lens.values())))
-                    if y_true1.shape[0] == n_samples:
-                        y_true = y_true1
-                    elif y_true2.shape[0] == n_samples:
-                        y_true = y_true2
-                    else:
-                        print(
-                            f"[skip] nenhum CSV de rótulo com {n_samples} linhas — "
-                            f"encoder={encoder} classificador={classificador} teste={teste} batch={batch} | "
-                            f"test={y_true1.shape[0]} full={y_true2.shape[0]}"
-                        )
-                        continue
 
-                    for n in range(2, 11, 1):
-                        print(n)
-                        fusions = make_fusion(n, path_npy, y_true)
-                        for comb, fusion in fusions.items():
-                            for f_name, value in fusion.items():
-                                rows.append({
-                                    'encoder': encoder,
-                                    'classificador': classificador,
-                                    'teste': teste,
-                                    'batch': batch,
-                                    'n_models': n,
-                                    'combination': comb,
-                                    'fusion_method': f_name,
-                                    'value': value
-                                })       
-                                
-data = pd.DataFrame(rows)
-data.to_csv("/home/lucas/representation-fusion/combinacoes.csv", index=False)           
+def load_y_true(teste, n_samples):
+    for suffix in ["_test.csv", ".csv"]:
+        p = f"{BASE_CSV_DIR}/{teste}/{teste}{suffix}"
+        if os.path.isfile(p):
+            y = pd.read_csv(p)["class"].values
+            if len(y) == n_samples:
+                return y
+    raise ValueError(f"No label CSV with {n_samples} rows for '{teste}'")
+
+
+def sample_half(all_combs):
+    """Return ~50% of combinations, drawn randomly without replacement."""
+    k = max(1, len(all_combs) // 2)
+    return random.sample(all_combs, k)
+
+
+# ─────────────────────────── core worker ──────────────────────────────────────
+
+def process_task(args):
+    """
+    Worker function executed in a separate process.
+    Loads arrays once, iterates over n_models=2..10 with 50% sampled combos.
+    Returns a list of row-dicts.
+    """
+    encoder, classificador, teste, batch = args
+    rows = []
+
+    # ── check directory exists ──
+    ref_dir = (
+        f"{BASE_MODEL_DIR}/Modelo_Kyoto-0/"
+        f"Classificador-{encoder}/Resultados/"
+        f"Treinados_em_{classificador}/{teste}"
+    )
+    if not os.path.isdir(ref_dir):
+        return rows
+
+    # ── load arrays (once per task) ──
+    try:
+        arrays, n_samples = check_and_load_arrays(encoder, classificador, teste, batch)
+    except Exception as e:
+        logger.warning(f"[skip load] {encoder}/{classificador}/{teste}/batch={batch}: {e}")
+        return rows
+
+    # ── load ground truth ──
+    try:
+        y_true = load_y_true(teste, n_samples)
+    except Exception as e:
+        logger.warning(f"[skip y_true] {encoder}/{classificador}/{teste}/batch={batch}: {e}")
+        return rows
+
+    # ── iterate over ensemble sizes ──
+    for n in range(2, N_MODELS_TOTAL + 1):
+        all_combs = list(combinations(ALL_MODEL_IDS, n))
+        selected  = sample_half(all_combs)
+
+        for comb in selected:
+            stacked = np.stack([arrays[mid] for mid in comb], axis=0)  # [n, N, C]
+            for fname, ffunc in FUSION_METHODS.items():
+                y_pred = np.argmax(ffunc(stacked), axis=1)
+                acc    = accuracy_score(y_true, y_pred)
+                rows.append({
+                    "encoder":       encoder,
+                    "classificador": classificador,
+                    "teste":         teste,
+                    "batch":         batch,
+                    "n_models":      n,
+                    "combination":   comb,
+                    "fusion_method": fname,
+                    "value":         acc,
+                })
+
+    return rows
+
+
+# ─────────────────────────── main ─────────────────────────────────────────────
+
+def main():
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    # Build task list
+    tasks = [
+        (encoder, classificador, teste, batch)
+        for encoder, classificadores in DICT_COMBINATIONS.items()
+        for classificador in classificadores
+        for teste in TESTES
+        for batch in BATCHES
+    ]
+    logger.info(f"Total tasks: {len(tasks)}")
+
+    n_workers = max(1, multiprocessing.cpu_count() - 1)
+    logger.info(f"Using {n_workers} worker processes")
+
+    all_rows = []
+    lock     = threading.Lock()   # used only in the main thread for safe accumulation
+    done     = 0
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        futures = {executor.submit(process_task, t): t for t in tasks}
+
+        for fut in as_completed(futures):
+            task = futures[fut]
+            try:
+                rows = fut.result()
+            except Exception as e:
+                logger.error(f"Task {task} raised: {e}")
+                rows = []
+
+            all_rows.extend(rows)
+            done += 1
+
+            # ── partial save every 20 completed tasks ──
+            if done % 20 == 0 or done == len(tasks):
+                encoder = task[0]
+                partial_path = os.path.join(OUT_DIR, f"combinacoes_intermediaria_{encoder}.csv")
+                encoder_rows = [r for r in all_rows if r["encoder"] == encoder]
+                if encoder_rows:
+                    pd.DataFrame(encoder_rows).to_csv(partial_path, index=False)
+                logger.info(f"[{done}/{len(tasks)}] saved partial → {partial_path}")
+
+    # ── final save ──
+    final_path = os.path.join(OUT_DIR, "combinacoes.csv")
+    pd.DataFrame(all_rows).to_csv(final_path, index=False)
+    logger.info(f"Done. Final CSV → {final_path}  ({len(all_rows)} rows)")
+
+
+if __name__ == "__main__":
+    main()
