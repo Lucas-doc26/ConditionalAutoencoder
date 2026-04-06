@@ -98,6 +98,28 @@ def npy_path(encoder, classificador, teste, batch, model_id):
     )
 
 
+def ensure_probability_array(arr, path):
+    if arr.ndim != 2:
+        raise ValueError(f"Unsupported array shape {arr.shape} in {path}; expected [N, C]")
+    if arr.shape[0] == 0:
+        raise ValueError(f"Empty probability array in {path}")
+    if arr.shape[1] < 2:
+        raise ValueError(f"Array in {path} must contain at least 2 classes, got shape {arr.shape}")
+
+    if np.any(np.isnan(arr)) or np.any(np.isinf(arr)):
+        raise ValueError(f"NaN or infinite values found in {path}")
+
+    if not np.all((arr >= 0.0) & (arr <= 1.0)):
+        logger.warning(f"Values outside [0, 1] found in {path}; check whether this is logits instead of probabilities")
+
+    row_sums = arr.sum(axis=1)
+    if not np.allclose(row_sums, 1.0, atol=1e-3):
+        logger.warning(
+            f"Row sums in {path} are not all ~1 (min={row_sums.min():.4f}, max={row_sums.max():.4f}); "
+            "this can indicate misformatted probabilities or misaligned labels"
+        )
+
+
 def check_and_load_arrays(encoder, classificador, teste, batch):
     """
     Loads all 10 model arrays for a given task.
@@ -111,7 +133,9 @@ def check_and_load_arrays(encoder, classificador, teste, batch):
         if not os.path.isfile(p):
             raise FileNotFoundError(f"Missing: {p}")
         arr = np.load(p)          # load fully once; faster than mmap for repeated access
-        arrays[mid] = arr.astype(np.float32, copy=False)
+        arr = arr.astype(np.float32, copy=False)
+        ensure_probability_array(arr, p)
+        arrays[mid] = arr
         n_samples_set.add(arr.shape[0])
 
     if len(n_samples_set) != 1:
@@ -124,9 +148,13 @@ def load_y_true(teste, n_samples):
     for suffix in ["_test.csv", ".csv"]:
         p = f"{BASE_CSV_DIR}/{teste}/{teste}{suffix}"
         if os.path.isfile(p):
-            y = pd.read_csv(p)["class"].values
-            if len(y) == n_samples:
-                return y
+            df = pd.read_csv(p)
+            if "class" not in df.columns:
+                raise ValueError(f"Label file {p} does not contain a 'class' column")
+            y = df["class"].values
+            if len(y) != n_samples:
+                raise ValueError(f"CSV {p} has {len(y)} rows but expected {n_samples}")
+            return y
     raise ValueError(f"No label CSV with {n_samples} rows for '{teste}'")
 
 
@@ -138,11 +166,36 @@ def sample_half(all_combs):
 
 # ─────────────────────────── core worker ──────────────────────────────────────
 
+def validate_alignment(arr, y_true, encoder, classificador, teste, batch):
+    if arr.shape[0] != len(y_true):
+        raise ValueError(
+            f"Loaded probabilities have {arr.shape[0]} samples but y_true has {len(y_true)} rows "
+            f"for {encoder}/{classificador}/{teste}/batch={batch}"
+        )
+
+    if arr.ndim != 2:
+        raise ValueError(
+            f"Expected probability array with ndim=2, got {arr.ndim} for {encoder}/{classificador}/{teste}/batch={batch}"
+        )
+
+    y_true_int = y_true.astype(np.int64)
+    unique_classes = np.unique(y_true_int)
+    if len(unique_classes) == 2 and np.array_equal(unique_classes, [0, 1]):
+        preds = np.argmax(arr, axis=1)
+        acc = accuracy_score(y_true_int, preds)
+        acc_flip = accuracy_score(y_true_int, 1 - preds)
+        if acc_flip > acc + 1e-6:
+            raise ValueError(
+                f"Detected probable binary label inversion for {encoder}/{classificador}/{teste}/batch={batch}: "
+                f"accuracy={acc:.4f}, flipped_accuracy={acc_flip:.4f}"
+            )
+
+
 def process_task(args):
     """
-    Worker function executed in a separate process.
+    Worker function executed em um processo separado.
     Loads arrays once, iterates over n_models=2..10 with 50% sampled combos.
-    Returns a list of row-dicts.
+    Returns uma lista de dicionários.
     """
     encoder, classificador, teste, batch = args
     rows = []
@@ -168,6 +221,14 @@ def process_task(args):
         y_true = load_y_true(teste, n_samples)
     except Exception as e:
         logger.warning(f"[skip y_true] {encoder}/{classificador}/{teste}/batch={batch}: {e}")
+        return rows
+
+    # ── validate alignment on the first available model
+    try:
+        representative = next(iter(arrays.values()))
+        validate_alignment(representative, y_true, encoder, classificador, teste, batch)
+    except Exception as e:
+        logger.warning(f"[skip alignment] {encoder}/{classificador}/{teste}/batch={batch}: {e}")
         return rows
 
     # ── iterate over ensemble sizes ──
