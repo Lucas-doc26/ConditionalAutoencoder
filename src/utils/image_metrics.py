@@ -47,14 +47,14 @@ def calculate_vif_torch(image1, image2):
         # batch
         vifs = []
         for i in range(image1.size(0)):
-            img1 = image1[i].permute(1, 2, 0).numpy()
-            img2 = image2[i].permute(1, 2, 0).numpy()
+            img1 = image1[i].permute(1, 2, 0).detach().numpy()
+            img2 = image2[i].permute(1, 2, 0).detach().numpy()
             vifs.append(sewar.full_ref.vifp(img1, img2))
         return float(np.mean(vifs))
 
     elif image1.dim() == 3:
-        img1 = image1.permute(1, 2, 0).numpy()
-        img2 = image2.permute(1, 2, 0).numpy()
+        img1 = image1.permute(1, 2, 0).detach().numpy()
+        img2 = image2.permute(1, 2, 0).detach().numpy()
         return float(sewar.full_ref.vifp(img1, img2))
 
 def calculate_scc_torch(image1, image2):
@@ -67,14 +67,14 @@ def calculate_scc_torch(image1, image2):
         # batch
         vifs = []
         for i in range(image1.size(0)):
-            img1 = image1[i].permute(1, 2, 0).numpy()
-            img2 = image2[i].permute(1, 2, 0).numpy()
+            img1 = image1[i].permute(1, 2, 0).detach().numpy()
+            img2 = image2[i].permute(1, 2, 0).detach().numpy()
             vifs.append(sewar.full_ref.scc(img1, img2))
         return float(np.mean(vifs))
 
     elif image1.dim() == 3:
-        img1 = image1.permute(1, 2, 0).numpy()
-        img2 = image2.permute(1, 2, 0).numpy()
+        img1 = image1.permute(1, 2, 0).detach().numpy()
+        img2 = image2.permute(1, 2, 0).detach().numpy()
         return float(sewar.full_ref.scc(img1, img2))
 
 def calculate_rmse_torch(image1, image2):
@@ -87,14 +87,14 @@ def calculate_rmse_torch(image1, image2):
         # batch
         vifs = []
         for i in range(image1.size(0)):
-            img1 = image1[i].permute(1, 2, 0).numpy()
-            img2 = image2[i].permute(1, 2, 0).numpy()
+            img1 = image1[i].permute(1, 2, 0).detach().numpy()
+            img2 = image2[i].permute(1, 2, 0).detach().numpy()
             vifs.append(sewar.full_ref.rmse(img1, img2))
         return float(np.mean(vifs))
 
     elif image1.dim() == 3:
-        img1 = image1.permute(1, 2, 0).numpy()
-        img2 = image2.permute(1, 2, 0).numpy()
+        img1 = image1.permute(1, 2, 0).detach().numpy()
+        img2 = image2.permute(1, 2, 0).detach().numpy()
         return float(sewar.full_ref.rmse(img1, img2))
 
 def calculate_all_metrics_torch(image1, image2):

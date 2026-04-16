@@ -24,6 +24,32 @@ from src.utils.plot import plot_reconstruction, denormalize
 from src.utils.image_metrics import *
 from src.models.loss.autoencoder_loss import ssim_loss, orthogonal_loss
 
+import numpy as np
+
+def normalize_mse(x, max_mse=1.0):
+    # MSE ∈ [0, +∞) → invertido (menor é melhor)
+    return np.clip(1 - (x / max_mse), 0, 1)
+
+def normalize_ssim(x):
+    # SSIM ∈ [-1, 1] → geralmente [0,1]
+    return np.clip((x + 1) / 2, 0, 1)
+
+def normalize_psnr(x, min_psnr=0, max_psnr=50):
+    # PSNR ∈ [0, ~50+] (depende do caso)
+    return np.clip((x - min_psnr) / (max_psnr - min_psnr), 0, 1)
+
+def normalize_ncc(x):
+    # NCC ∈ [-1, 1]
+    return np.clip((x + 1) / 2, 0, 1)
+
+def normalize_vif(x, max_vif=1.0):
+    # VIF ≥ 0, normalmente até ~1
+    return np.clip(x / max_vif, 0, 1)
+
+def normalize_scc(x):
+    # SCC ∈ [-1, 1]
+    return np.clip((x + 1) / 2, 0, 1)
+
 
 train = CustomImageDataset(
     csv="/home/lucas.ocunha/ConditionalAutoencoder/CSV/UFPR04/batches/batch-1024.csv",
@@ -134,12 +160,12 @@ def combined_loss(
     metrics1 = calculate_all_metrics_torch(recon1, target)
     
 
-    mse_l = normalize_mse((metrics0['MSE'] + metrics1['MSE'] / 2))
-    ssim_l = normalize_ssim((metrics0['SSIM'] + metrics1['SSIM'] / 2))
-    psnr_l = normalize_psnr((metrics0['PSNR'] + metrics1['PSNR'] / 2))
-    ncc_l = normalize_ncc((metrics0['NCC'] + metrics1['NCC'] / 2))
-    vif_l = normalize_vif((metrics0['VIF'] + metrics1['VIF'] / 2))
-    scc_l = normalize_scc((metrics0['SCC'] + metrics1['SCC'] / 2))
+    mse_l = normalize_mse(((metrics0['MSE'] + metrics1['MSE']) / 2))
+    ssim_l = normalize_ssim(((metrics0['SSIM'] + metrics1['SSIM']) / 2))
+    psnr_l = normalize_psnr(((metrics0['PSNR'] + metrics1['PSNR']) / 2))
+    ncc_l = normalize_ncc(((metrics0['NCC'] + metrics1['NCC']) / 2))
+    vif_l = normalize_vif(((metrics0['VIF'] + metrics1['VIF']) / 2))
+    scc_l = normalize_scc(((metrics0['SCC'] + metrics1['SCC']) / 2))
 
     # Pesos das métricas (normaliza para soma=1 -> rec_loss em [0,1])
     image_weights = {
@@ -166,7 +192,7 @@ def combined_loss(
     )
 
     # Orthogonalidade: cosine^2 média => [0,1] (0 bom, 1 ruim)
-    ort_loss = orthogonal_loss(z0, z1).clamp(0.0, 1.0)
+    ort_loss = orthogonal_loss([z0, z1]).clamp(0.0, 1.0)
 
     total_loss = rec_weight * rec_loss + (1.0 - rec_weight) * ort_loss
     return total_loss.clamp(0.0, 1.0)
@@ -419,10 +445,6 @@ def train_models(
 
 
         return val_epoch_loss, mean_distance
-
-
-
-
 
 # GRID SEARCH
 
