@@ -154,8 +154,14 @@ def plot_all_reconstructions(originals, recons_list, save_path, n_images=8):
     fig, axes = plt.subplots(n_rows, n_col, figsize=(2.5 * n_col, 2.5 * n_rows))
 
     def to_np(t):
-        img = denormalize(t.detach().cpu())
-        img = torch.clamp(img, 0, 1).permute(1, 2, 0).numpy()
+        # garante 3D (C, H, W) antes de chamar denormalize
+        t = t.detach().cpu()
+        if t.dim() == 3:
+            t = t.unsqueeze(0)          # (1, C, H, W) para denormalize
+        img = denormalize(t)            # pode retornar (1, C, H, W) ou (C, H, W)
+        if img.dim() == 4:
+            img = img.squeeze(0)        # → (C, H, W)
+        img = torch.clamp(img, 0, 1).permute(1, 2, 0).numpy()  # (H, W, C)
         return img
 
     all_rows = [originals] + recons_list
@@ -206,7 +212,11 @@ device = config.DEVICE0
 # Treinamento
 # ─────────────────────────────────────────────
 
+
+
 def train_models(num_epochs=50):
+    # URI local explícita — evita erros se o CWD mudar
+    mlflow.set_tracking_uri(config.IP_LOCAL)
     mlflow.set_experiment("JointAutoencoder-4-Modelos")
 
     with mlflow.start_run(run_name="4-autoencoders-joint"):
@@ -228,7 +238,7 @@ def train_models(num_epochs=50):
         scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-5)
 
         # Mixed precision
-        scaler = torch.cuda.amp.GradScaler(enabled=device.type == "cuda")
+        scaler = torch.cuda.amp.GradScaler(True)
 
         best_val_loss = float("inf")
 
@@ -252,7 +262,7 @@ def train_models(num_epochs=50):
 
                 optimizer.zero_grad(set_to_none=True)
 
-                with torch.cuda.amp.autocast(enabled=device.type == "cuda"):
+                with torch.cuda.amp.autocast(True):
                     recons, zs = [], []
                     for m in models:
                         recon, z = forward_model(m, x)
@@ -289,7 +299,7 @@ def train_models(num_epochs=50):
                     x = x.to(device, non_blocking=True)
                     y = y.to(device, non_blocking=True)
 
-                    with torch.cuda.amp.autocast(enabled=device.type == "cuda"):
+                    with torch.cuda.amp.autocast(True):
                         recons, zs = [], []
                         for m in models:
                             recon, z = forward_model(m, x)
@@ -340,17 +350,18 @@ def train_models(num_epochs=50):
                 for name, r_dn in zip(MODEL_NAMES, recons_dn):
                     batch_m = calculate_all_metrics_torch(x_dn, r_dn)
                     for k in metrics_sum[name]:
-                        metrics_sum[name][k] += batch_m[k]
+                        metrics_sum[name][k] += float(batch_m[k])  # float() libera o grafo
 
-                last_x      = x
-                last_recons = recons
+                last_x      = x.cpu()          # CPU antes de sair do loop
+                last_recons = [r.cpu() for r in recons]
 
         n_test_batches = len(test_loader)
         for name in MODEL_NAMES:
+            # MLflow só aceita [a-zA-Z0-9._/ ] em nomes de métrica — remove hífens
+            safe_name = name.replace("-", "_")
             for k in metrics_sum[name]:
                 avg = metrics_sum[name][k] / n_test_batches
-                # ex: "test_JointAE-0_mse"
-                mlflow.log_metric(f"test_{name}_{k.lower()}", avg)
+                mlflow.log_metric(f"test_{safe_name}_{k.lower()}", float(avg))
 
         # ── Plot: reconstruções dos 4 modelos ────────
         os.makedirs("./results/Joint-4-Models", exist_ok=True)
