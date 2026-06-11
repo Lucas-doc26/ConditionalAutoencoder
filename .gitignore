@@ -15,3 +15,7 @@
 *.tar.gz
 *.gz
 /PKLot
+*.csv 
+*.npy
+*.np
+*.npz

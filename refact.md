@@ -1,0 +1,3 @@
+# Refatorar meus modelos 
+
+Preciso mudar todos os meus modelos de 128x128 de input para 64x64. Não quero que altere a estrutura, somente o cálculo das camadas e afins. Feito isso para todos os autoencoders básicos, crie os mesmo 10 modelos, mas agora para os outros: skp connections, vae e joint autoencoder. Não altere a estrutura do código, faça mudança apenas no tamanho do input e calculo das camadas. 

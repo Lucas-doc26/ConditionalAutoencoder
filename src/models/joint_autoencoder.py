@@ -20,25 +20,25 @@ class JointSkipEncoder0(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32 * 32 * 16, latent_dim)
+        self.fc = nn.Linear(16 * 16 * 16, latent_dim)
 
     def forward(self, x):
-        x1 = F.relu(self.conv1(x))   # (B, 8, 128, 128)
-        x = self.pool(x1)            # (B, 8, 64, 64)
+        x1 = F.relu(self.conv1(x))   # (B, 8, 64, 64)
+        x = self.pool(x1)            # (B, 8, 32, 32)
 
-        x2 = F.relu(self.conv2(x))   # (B, 16, 64, 64)
-        x = self.pool(x2)            # (B, 16, 32, 32)
+        x2 = F.relu(self.conv2(x))   # (B, 16, 32, 32)
+        x = self.pool(x2)            # (B, 16, 16, 16)
 
-        x = self.flatten(x)         # (B, 16384)
+        x = self.flatten(x)         # (B, 4096)
         z = self.fc(x)              # (B, LATENT_DIMS[0])
         return z, x1, x2
-    
+
 class JointSkipDecoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 32 * 32 * 16)
+        self.fc = nn.Linear(latent_dim, 16 * 16 * 16)
 
         self.conv1 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(16, 8, kernel_size=3, padding=1)
@@ -47,18 +47,18 @@ class JointSkipDecoder0(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, z, JointSkip1, JointSkip2):
-        x = self.fc(z)                       # (B, 16384)
-        x = x.view(-1, 16, 32, 32)           # (B, 16, 32, 32)
+        x = self.fc(z)                       # (B, 4096)
+        x = x.view(-1, 16, 16, 16)           # (B, 16, 16, 16)
 
-        x = F.relu(self.conv1(x))            # (B, 16, 32, 32)
-        x = self.upsample(x)                 # (B, 16, 64, 64)
+        x = F.relu(self.conv1(x))            # (B, 16, 16, 16)
+        x = self.upsample(x)                 # (B, 16, 32, 32)
         x = x + JointSkip2                        # JointSkip connection
 
-        x = F.relu(self.conv2(x))            # (B, 8, 64, 64)
-        x = self.upsample(x)                 # (B, 8, 128, 128)
+        x = F.relu(self.conv2(x))            # (B, 8, 32, 32)
+        x = self.upsample(x)                 # (B, 8, 64, 64)
         x = x + JointSkip1                        # JointSkip connection
 
-        x = self.conv3(x)                    # (B, 3, 128, 128)
+        x = self.conv3(x)                    # (B, 3, 64, 64)
         return x
     
 class JointSkipAutoencoder0(nn.Module):
@@ -87,21 +87,21 @@ class JointSkipEncoder1(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(16 * 16 * 32, latent_dim)
+        self.fc = nn.Linear(8 * 8 * 32, latent_dim)
 
     def forward(self, x):
-        x1 = F.relu(self.conv1(x))   # (B, 32, 128, 128)
-        x = self.pool(x1)            # (B, 32, 64, 64)
+        x1 = F.relu(self.conv1(x))   # (B, 32, 64, 64)
+        x = self.pool(x1)            # (B, 32, 32, 32)
 
-        x2 = F.relu(self.conv2(x))   # (B, 8, 64, 64)
-        x = self.pool(x2)            # (B, 8, 32, 32)
+        x2 = F.relu(self.conv2(x))   # (B, 8, 32, 32)
+        x = self.pool(x2)            # (B, 8, 16, 16)
 
-        x3 = F.relu(self.conv3(x))   # (B, 64, 32, 32)
-        x = self.pool(x3)           # (B, 64, 16, 16)
-        
-        x4 = F.relu(self.conv4(x))   # (B, 32, 16, 16)
-        
-        x = self.flatten(x4)         # (B, 8192)
+        x3 = F.relu(self.conv3(x))   # (B, 64, 16, 16)
+        x = self.pool(x3)            # (B, 64, 8, 8)
+
+        x4 = F.relu(self.conv4(x))   # (B, 32, 8, 8)
+
+        x = self.flatten(x4)         # (B, 2048)
         z = self.fc(x)              # (B, LATENT_DIMS[1])
         return z, x1, x2, x3, x4
 
@@ -110,7 +110,7 @@ class JointSkipDecoder1(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 16 * 16 * 32)
+        self.fc = nn.Linear(latent_dim, 8 * 8 * 32)
 
         self.conv1 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
@@ -121,22 +121,22 @@ class JointSkipDecoder1(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
         
     def forward(self, z, x1, x2, x3, x4):
-        x = self.fc(z)                       # (B, 8192)
-        x = x.view(-1, 32, 16, 16)           # (B, 32, 16, 16)
+        x = self.fc(z)                       # (B, 2048)
+        x = x.view(-1, 32, 8, 8)            # (B, 32, 8, 8)
 
-        x = F.relu(self.conv1(x))            # (B, 32, 16, 16)
+        x = F.relu(self.conv1(x))            # (B, 32, 8, 8)
         x = x + x4                        # JointSkip connection
-        x = F.relu(self.conv2(x))            # (B, 64, 16, 16)
-        x = self.upsample(x)                 # (B, 64, 32, 32)
+        x = F.relu(self.conv2(x))            # (B, 64, 8, 8)
+        x = self.upsample(x)                 # (B, 64, 16, 16)
         x = x + x3                        # JointSkip connection
 
-        x = F.relu(self.conv3(x))            # (B, 8, 32, 32)
-        x = self.upsample(x)                 # (B, 8, 64, 64)
+        x = F.relu(self.conv3(x))            # (B, 8, 16, 16)
+        x = self.upsample(x)                 # (B, 8, 32, 32)
         x = x + x2                        # JointSkip connection
-        x = F.relu(self.conv4(x))            # (B, 32, 64, 64)
-        x = self.upsample(x)                 # (B, 32, 128, 128)
+        x = F.relu(self.conv4(x))            # (B, 32, 32, 32)
+        x = self.upsample(x)                 # (B, 32, 64, 64)
         x = x + x1                        # JointSkip connection
-        x = self.conv5(x)                    # (B, 3, 128, 128)
+        x = self.conv5(x)                    # (B, 3, 64, 64)
 
         return x
     
@@ -166,25 +166,25 @@ class JointEncoder0(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32 * 32 * 16, self.latent_dim)
+        self.fc = nn.Linear(16 * 16 * 16, self.latent_dim)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))   # (B, 8, 128, 128)
-        x = self.pool(x)            # (B, 8, 64, 64)
+        x = F.relu(self.conv1(x))   # (B, 8, 64, 64)
+        x = self.pool(x)            # (B, 8, 32, 32)
 
-        x = F.relu(self.conv2(x))   # (B, 16, 64, 64)
-        x = self.pool(x)            # (B, 16, 32, 32)
+        x = F.relu(self.conv2(x))   # (B, 16, 32, 32)
+        x = self.pool(x)            # (B, 16, 16, 16)
 
-        x = self.flatten(x)         # (B, 16384)
-        x = self.fc(x)              # (B, 1849)
+        x = self.flatten(x)         # (B, 4096)
+        x = self.fc(x)              # (B, LATENT_DIMS[0])
         return x
-    
+
 class JointDecoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(self.latent_dim, 32 * 32 * 16)
+        self.fc = nn.Linear(self.latent_dim, 16 * 16 * 16)
 
         self.conv1 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(16, 8, kernel_size=3, padding=1)
@@ -193,18 +193,18 @@ class JointDecoder0(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, x):
-        x = self.fc(x)                       # (B, 16384)
-        x = x.view(-1, 16, 32, 32)           # (B, 16, 32, 32)
+        x = self.fc(x)                       # (B, 4096)
+        x = x.view(-1, 16, 16, 16)           # (B, 16, 16, 16)
 
-        x = F.relu(self.conv1(x))            # (B, 16, 32, 32)
-        x = self.upsample(x)                 # (B, 16, 64, 64)
+        x = F.relu(self.conv1(x))            # (B, 16, 16, 16)
+        x = self.upsample(x)                 # (B, 16, 32, 32)
 
-        x = F.relu(self.conv2(x))            # (B, 8, 64, 64)
-        x = self.upsample(x)                 # (B, 8, 128, 128)
+        x = F.relu(self.conv2(x))            # (B, 8, 32, 32)
+        x = self.upsample(x)                 # (B, 8, 64, 64)
 
-        x = self.conv3(x)                    # (B, 3, 128, 128)
+        x = self.conv3(x)                    # (B, 3, 64, 64)
         return x
-    
+
 class JointAutoencoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
@@ -230,29 +230,29 @@ class JointEncoder1(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(16 * 16 * 32, self.latent_dim)
+        self.fc = nn.Linear(8 * 8 * 32, self.latent_dim)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))   # (B, 8, 128, 128)
-        x = self.pool(x)            # (B, 8, 64, 64)
+        x = F.relu(self.conv1(x))   # (B, 32, 64, 64)
+        x = self.pool(x)            # (B, 32, 32, 32)
 
-        x = F.relu(self.conv2(x))   # (B, 16, 64, 64)
-        x = self.pool(x)            # (B, 16, 32, 32)
+        x = F.relu(self.conv2(x))   # (B, 8, 32, 32)
+        x = self.pool(x)            # (B, 8, 16, 16)
 
-        x = F.relu(self.conv3(x))   # (B, 16, 64, 64)
-        x = self.pool(x)           # (B, 16, 32, 32)
-        
-        x = F.relu(self.conv4(x))   # (B, 16, 64, 64)
-        
-        x = self.flatten(x)         # (B, 16384)
+        x = F.relu(self.conv3(x))   # (B, 64, 16, 16)
+        x = self.pool(x)            # (B, 64, 8, 8)
+
+        x = F.relu(self.conv4(x))   # (B, 32, 8, 8)
+
+        x = self.flatten(x)         # (B, 2048)
         x = self.fc(x)              # (B, LATENT_DIMS[1])
         return x
-    
+
 class JointDecoder1(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()
         self.latent_dim = latent_dim
-        self.fc = nn.Linear(self.latent_dim, 16 * 16 * 32)
+        self.fc = nn.Linear(self.latent_dim, 8 * 8 * 32)
 
         self.conv1 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
@@ -263,23 +263,23 @@ class JointDecoder1(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
         
     def forward(self, x):
-        x = self.fc(x)                       # (B, 8192)
-        x = x.view(-1, 32, 16, 16)           # (B, 32, 16, 16)
+        x = self.fc(x)                       # (B, 2048)
+        x = x.view(-1, 32, 8, 8)            # (B, 32, 8, 8)
 
-        x = F.relu(self.conv1(x))            # (B, 32, 16, 16)
-        x = F.relu(self.conv2(x))            # (B, 64, 16, 16)
-        x = self.upsample(x)                 # (B, 64, 32, 32)
+        x = F.relu(self.conv1(x))            # (B, 32, 8, 8)
+        x = F.relu(self.conv2(x))            # (B, 64, 8, 8)
+        x = self.upsample(x)                 # (B, 64, 16, 16)
 
-        x = F.relu(self.conv3(x))            # (B, 8, 32, 32)
-        x = self.upsample(x)                 # (B, 8, 64, 64)
+        x = F.relu(self.conv3(x))            # (B, 8, 16, 16)
+        x = self.upsample(x)                 # (B, 8, 32, 32)
 
-        x = F.relu(self.conv4(x))            # (B, 32, 64, 64)
-        x = self.upsample(x)                 # (B, 32, 128, 128)
+        x = F.relu(self.conv4(x))            # (B, 32, 32, 32)
+        x = self.upsample(x)                 # (B, 32, 64, 64)
 
-        x = self.conv5(x)                    # (B, 3, 128, 128)
+        x = self.conv5(x)                    # (B, 3, 64, 64)
 
         return x
-    
+
 class JointAutoencoder1(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[1]):
         super().__init__()

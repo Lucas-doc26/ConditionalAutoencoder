@@ -18,25 +18,25 @@ class SkipEncoder0(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32 * 32 * 16, latent_dim)
+        self.fc = nn.Linear(16 * 16 * 16, latent_dim)
 
     def forward(self, x):
-        x1 = F.relu(self.conv1(x))   # (B, 8, 128, 128)
-        x = self.pool(x1)            # (B, 8, 64, 64)
+        x1 = F.relu(self.conv1(x))   # (B, 8, 64, 64)
+        x = self.pool(x1)            # (B, 8, 32, 32)
 
-        x2 = F.relu(self.conv2(x))   # (B, 16, 64, 64)
-        x = self.pool(x2)            # (B, 16, 32, 32)
+        x2 = F.relu(self.conv2(x))   # (B, 16, 32, 32)
+        x = self.pool(x2)            # (B, 16, 16, 16)
 
-        x = self.flatten(x)         # (B, 16384)
+        x = self.flatten(x)         # (B, 4096)
         z = self.fc(x)              # (B, LATENT_DIMS[0])
         return z, x1, x2
-    
+
 class SkipDecoder0(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[0]):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 32 * 32 * 16)
+        self.fc = nn.Linear(latent_dim, 16 * 16 * 16)
 
         self.conv1 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(16, 8, kernel_size=3, padding=1)
@@ -45,18 +45,18 @@ class SkipDecoder0(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, z, skip1, skip2):
-        x = self.fc(z)                       # (B, 16384)
-        x = x.view(-1, 16, 32, 32)           # (B, 16, 32, 32)
+        x = self.fc(z)                       # (B, 4096)
+        x = x.view(-1, 16, 16, 16)           # (B, 16, 16, 16)
 
-        x = F.relu(self.conv1(x))            # (B, 16, 32, 32)
-        x = self.upsample(x)                 # (B, 16, 64, 64)
+        x = F.relu(self.conv1(x))            # (B, 16, 16, 16)
+        x = self.upsample(x)                 # (B, 16, 32, 32)
         x = x + skip2                        # Skip connection
 
-        x = F.relu(self.conv2(x))            # (B, 8, 64, 64)
-        x = self.upsample(x)                 # (B, 8, 128, 128)
+        x = F.relu(self.conv2(x))            # (B, 8, 32, 32)
+        x = self.upsample(x)                 # (B, 8, 64, 64)
         x = x + skip1                        # Skip connection
 
-        x = self.conv3(x)                    # (B, 3, 128, 128)
+        x = self.conv3(x)                    # (B, 3, 64, 64)
         return x
     
 class SkipAutoencoder0(nn.Module):
@@ -85,21 +85,21 @@ class SkipEncoder1(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(16 * 16 * 32, latent_dim)
+        self.fc = nn.Linear(8 * 8 * 32, latent_dim)
 
     def forward(self, x):
-        x1 = F.relu(self.conv1(x))   # (B, 32, 128, 128)
-        x = self.pool(x1)            # (B, 32, 64, 64)
+        x1 = F.relu(self.conv1(x))   # (B, 32, 64, 64)
+        x = self.pool(x1)            # (B, 32, 32, 32)
 
-        x2 = F.relu(self.conv2(x))   # (B, 8, 64, 64)
-        x = self.pool(x2)            # (B, 8, 32, 32)
+        x2 = F.relu(self.conv2(x))   # (B, 8, 32, 32)
+        x = self.pool(x2)            # (B, 8, 16, 16)
 
-        x3 = F.relu(self.conv3(x))   # (B, 64, 32, 32)
-        x = self.pool(x3)           # (B, 64, 16, 16)
-        
-        x4 = F.relu(self.conv4(x))   # (B, 32, 16, 16)
-        
-        x = self.flatten(x4)         # (B, 8192)
+        x3 = F.relu(self.conv3(x))   # (B, 64, 16, 16)
+        x = self.pool(x3)            # (B, 64, 8, 8)
+
+        x4 = F.relu(self.conv4(x))   # (B, 32, 8, 8)
+
+        x = self.flatten(x4)         # (B, 2048)
         z = self.fc(x)              # (B, LATENT_DIMS[1])
         return z, x1, x2, x3, x4
 
@@ -108,7 +108,7 @@ class SkipDecoder1(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 16 * 16 * 32)
+        self.fc = nn.Linear(latent_dim, 8 * 8 * 32)
 
         self.conv1 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
@@ -119,22 +119,22 @@ class SkipDecoder1(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
         
     def forward(self, z, x1, x2, x3, x4):
-        x = self.fc(z)                       # (B, 8192)
-        x = x.view(-1, 32, 16, 16)           # (B, 32, 16, 16)
+        x = self.fc(z)                       # (B, 2048)
+        x = x.view(-1, 32, 8, 8)            # (B, 32, 8, 8)
 
-        x = F.relu(self.conv1(x))            # (B, 32, 16, 16)
+        x = F.relu(self.conv1(x))            # (B, 32, 8, 8)
         x = x + x4                        # Skip connection
-        x = F.relu(self.conv2(x))            # (B, 64, 16, 16)
-        x = self.upsample(x)                 # (B, 64, 32, 32)
+        x = F.relu(self.conv2(x))            # (B, 64, 8, 8)
+        x = self.upsample(x)                 # (B, 64, 16, 16)
         x = x + x3                        # Skip connection
 
-        x = F.relu(self.conv3(x))            # (B, 8, 32, 32)
-        x = self.upsample(x)                 # (B, 8, 64, 64)
+        x = F.relu(self.conv3(x))            # (B, 8, 16, 16)
+        x = self.upsample(x)                 # (B, 8, 32, 32)
         x = x + x2                        # Skip connection
-        x = F.relu(self.conv4(x))            # (B, 32, 64, 64)
-        x = self.upsample(x)                 # (B, 32, 128, 128)
+        x = F.relu(self.conv4(x))            # (B, 32, 32, 32)
+        x = self.upsample(x)                 # (B, 32, 64, 64)
         x = x + x1                        # Skip connection
-        x = self.conv5(x)                    # (B, 3, 128, 128)
+        x = self.conv5(x)                    # (B, 3, 64, 64)
 
         return x
     
@@ -166,23 +166,23 @@ class SkipEncoder2(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(16 * 16 * 16, latent_dim)
+        self.fc = nn.Linear(8 * 8 * 16, latent_dim)
 
     def forward(self, x):
-        x1 = F.relu(self.conv1(x))   # (B, 8, 128, 128)
+        x1 = F.relu(self.conv1(x))   # (B, 32, 64, 64)
 
-        x2 = F.relu(self.conv2(x1))   # (B, 16, 64, 64)
+        x2 = F.relu(self.conv2(x1))  # (B, 32, 64, 64)
 
-        x3 = F.relu(self.conv3(x2))   # (B, 16, 64, 64)
+        x3 = F.relu(self.conv3(x2))  # (B, 16, 64, 64)
         x = self.pool(x3)            # (B, 16, 32, 32)
 
-        x4 = F.relu(self.conv4(x))   # (B, 16, 64, 64)
-        x = self.pool(x4)            # (B, 16, 32, 32)
-        
-        x5 = F.relu(self.conv5(x))   # (B, 16, 64, 64)
-        x = self.pool(x5)            # (B, 16, 32, 32)
+        x4 = F.relu(self.conv4(x))   # (B, 16, 32, 32)
+        x = self.pool(x4)            # (B, 16, 16, 16)
 
-        x = self.flatten(x)         # (B, 16384)
+        x5 = F.relu(self.conv5(x))   # (B, 16, 16, 16)
+        x = self.pool(x5)            # (B, 16, 8, 8)
+
+        x = self.flatten(x)         # (B, 1024)
         x = self.fc(x)              # (B, 1411)
         return x, x1, x2, x3, x4, x5
 
@@ -191,7 +191,7 @@ class SkipDecoder2(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 16 * 16 * 16)
+        self.fc = nn.Linear(latent_dim, 8 * 8 * 16)
 
         self.conv6 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
@@ -203,28 +203,28 @@ class SkipDecoder2(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, z, x1, x2, x3, x4, x5):
-        x = self.fc(z)                       # (B, 4096)
-        x = x.view(-1, 16, 16, 16)           # (B, 16, 16, 16)
+        x = self.fc(z)                       # (B, 1024)
+        x = x.view(-1, 16, 8, 8)            # (B, 16, 8, 8)
 
-        x = F.relu(self.conv6(x))            # (B, 16, 16, 16)
-        x = self.upsample(x)                 # (B, 16, 32, 32)
+        x = F.relu(self.conv6(x))            # (B, 16, 8, 8)
+        x = self.upsample(x)                 # (B, 16, 16, 16)
         x = x + x5                        # Skip connection
 
-        x = F.relu(self.conv5(x))            # (B, 16, 32, 32)
-        x = self.upsample(x)                 # (B, 16, 64, 64)
+        x = F.relu(self.conv5(x))            # (B, 16, 16, 16)
+        x = self.upsample(x)                 # (B, 16, 32, 32)
         x = x + x4                        # Skip connection
-        
-        x = F.relu(self.conv4(x))            # (B, 32, 64, 64)
-        x = self.upsample(x)                 # (B, 32, 128, 128)
+
+        x = F.relu(self.conv4(x))            # (B, 16, 32, 32)
+        x = self.upsample(x)                 # (B, 16, 64, 64)
         x = x + x3                        # Skip connection
-        
-        x = F.relu(self.conv3(x))            # (B, 32, 128, 128)
+
+        x = F.relu(self.conv3(x))            # (B, 32, 64, 64)
         x = x + x2                        # Skip connection
-        
-        x = F.relu(self.conv2(x))            # (B, 32, 128, 128)
+
+        x = F.relu(self.conv2(x))            # (B, 32, 64, 64)
         x = x + x1                        # Skip connection
-        
-        x = self.conv1(x)                    # (B, 3, 128, 128)
+
+        x = self.conv1(x)                    # (B, 3, 64, 64)
 
         return x
     
@@ -254,7 +254,7 @@ class SkipEncoder3(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32 * 32 * 8, latent_dim)
+        self.fc = nn.Linear(16 * 16 * 8, latent_dim)
 
     def forward(self, x):
         x1 = F.relu(self.conv1(x))  
@@ -271,7 +271,7 @@ class SkipDecoder3(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 8 * 32 * 32)
+        self.fc = nn.Linear(latent_dim, 8 * 16 * 16)
 
         self.conv3 = nn.Conv2d(8, 8, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(8, 32, kernel_size=3, padding=1)
@@ -280,19 +280,19 @@ class SkipDecoder3(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, x, x1, x2):
-        x = self.fc(x)                       
-        x = x.view(-1, 8, 32, 32)          
+        x = self.fc(x)
+        x = x.view(-1, 8, 16, 16)
 
-        x = F.relu(self.conv3(x))            
-        x = self.upsample(x)        
-        x = x + x2                        # Skip connection         
+        x = F.relu(self.conv3(x))
+        x = self.upsample(x)
+        x = x + x2                        # Skip connection
 
         x = F.relu(self.conv2(x))
         x = self.upsample(x)
         x = x + x1                        # Skip connection
-                    
-        x = self.conv1(x) 
-        
+
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder3(nn.Module):
@@ -324,7 +324,7 @@ class SkipEncoder4(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(4 * 4 * 16, latent_dim)
+        self.fc = nn.Linear(2 * 2 * 16, latent_dim)
 
     def forward(self, x):
         x1 = F.relu(self.conv1(x))  
@@ -354,7 +354,7 @@ class SkipDecoder4(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 4 * 4 * 16)
+        self.fc = nn.Linear(latent_dim, 2 * 2 * 16)
 
         self.conv7 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
         self.conv6 = nn.Conv2d(16, 64, kernel_size=3, padding=1)
@@ -367,35 +367,34 @@ class SkipDecoder4(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, x, skip1, skip2, skip3, skip4, skip5, skip6):
-        x = self.fc(x)                       
-        x = x.view(-1, 16, 4, 4) 
-        
-        x = F.relu(self.conv7(x))         
+        x = self.fc(x)
+        x = x.view(-1, 16, 2, 2)
+
+        x = F.relu(self.conv7(x))
         x = self.upsample(x)
         x = x + skip6                        # Skip connection
-        
+
         x = F.relu(self.conv6(x))
         x = self.upsample(x)
         x = x + skip5                        # Skip connection
-        
+
         x = F.relu(self.conv5(x))
         x = self.upsample(x)
         x = x + skip4                        # Skip connection
-        
+
         x = F.relu(self.conv4(x))
         x = self.upsample(x)
         x = x + skip3                        # Skip connection
-        
-        x = F.relu(self.conv3(x))                  
+
+        x = F.relu(self.conv3(x))
         x = x + skip2                        # Skip connection
-        
-        x = F.relu(self.conv2(x))            
-        x = self.upsample(x)        
+
+        x = F.relu(self.conv2(x))
+        x = self.upsample(x)
         x = x + skip1                        # Skip connection
 
-                
-        x = self.conv1(x) 
-        
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder4(nn.Module):
@@ -423,7 +422,7 @@ class SkipEncoder5(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(16 * 16 * 8, latent_dim)
+        self.fc = nn.Linear(8 * 8 * 8, latent_dim)
 
     def forward(self, x):
         x1 = F.relu(self.conv1(x))  
@@ -445,7 +444,7 @@ class SkipDecoder5(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 8 * 16 * 16)
+        self.fc = nn.Linear(latent_dim, 8 * 8 * 8)
 
         self.conv4 = nn.Conv2d(8, 8, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(8, 128, kernel_size=3, padding=1)
@@ -455,23 +454,23 @@ class SkipDecoder5(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, z, skip1, skip2, skip3):
-        x = self.fc(z)                       
-        x = x.view(-1, 8, 16, 16) 
-        
+        x = self.fc(z)
+        x = x.view(-1, 8, 8, 8)
+
         x = F.relu(self.conv4(x))
         x = self.upsample(x)
         x = x + skip3                        # Skip connection
-        
-        x = F.relu(self.conv3(x))   
-        x = self.upsample(x)               
+
+        x = F.relu(self.conv3(x))
+        x = self.upsample(x)
         x = x + skip2                        # Skip connection
-        
-        x = F.relu(self.conv2(x))            
-        x = self.upsample(x)        
+
+        x = F.relu(self.conv2(x))
+        x = self.upsample(x)
         x = x + skip1                        # Skip connection
-        
-        x = self.conv1(x) 
-        
+
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder5(nn.Module):
@@ -498,7 +497,7 @@ class SkipEncoder6(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32 * 32 * 64, latent_dim)
+        self.fc = nn.Linear(16 * 16 * 64, latent_dim)
 
     def forward(self, x):
         x1 = F.relu(self.conv1(x))  
@@ -517,7 +516,7 @@ class SkipDecoder6(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 32 * 32 * 64)
+        self.fc = nn.Linear(latent_dim, 16 * 16 * 64)
 
         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(64, 16, kernel_size=3, padding=1)
@@ -526,19 +525,19 @@ class SkipDecoder6(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, z, skip1, skip2):
-        x = self.fc(z)                       
-        x = x.view(-1, 64, 32, 32) 
-        
+        x = self.fc(z)
+        x = x.view(-1, 64, 16, 16)
+
         x = F.relu(self.conv3(x))
         x = self.upsample(x)
         x = x + skip2                        # Skip connection
-        
-        x = F.relu(self.conv2(x))   
-        x = self.upsample(x)               
+
+        x = F.relu(self.conv2(x))
+        x = self.upsample(x)
         x = x + skip1                        # Skip connection
-        
-        x = self.conv1(x) 
-        
+
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder6(nn.Module):
@@ -567,26 +566,26 @@ class SkipEncoder7(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(16 * 16 * 16, latent_dim)
+        self.fc = nn.Linear(8 * 8 * 16, latent_dim)
 
     def forward(self, x):
-        x1 = F.relu(self.conv1(x))  
-        x = self.pool(x1)                
-        x2 = F.relu(self.conv2(x))  
+        x1 = F.relu(self.conv1(x))
+        x = self.pool(x1)
+        x2 = F.relu(self.conv2(x))
         x = self.pool(x2)
         x3 = F.relu(self.conv3(x))
         x = self.pool(x3)
-        x = self.flatten(x)        
-        
-        z = self.fc(x)            
+        x = self.flatten(x)
+
+        z = self.fc(x)
         return z, x1, x2, x3
-    
+
 class SkipDecoder7(nn.Module):
     def __init__(self, latent_dim=LATENT_DIMS[7]):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 16 * 16 * 16)
+        self.fc = nn.Linear(latent_dim, 8 * 8 * 16)
 
         self.conv4 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
@@ -596,23 +595,23 @@ class SkipDecoder7(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, z, x1, x2, x3):
-        x = self.fc(z)                       
-        x = x.view(-1, 16, 16, 16) 
-        
+        x = self.fc(z)
+        x = x.view(-1, 16, 8, 8)
+
         x = F.relu(self.conv4(x))
         x = self.upsample(x)
         x = x + x3                        # Skip connection
-        
+
         x = F.relu(self.conv3(x))
         x = self.upsample(x)
         x = x + x2                        # Skip connection
-        
+
         x = F.relu(self.conv2(x))
         x = self.upsample(x)
         x = x + x1                        # Skip connection
-        
-        x = self.conv1(x) 
-        
+
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder7(nn.Module):
@@ -640,7 +639,7 @@ class SkipEncoder8(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32 * 32 * 128, latent_dim)
+        self.fc = nn.Linear(16 * 16 * 128, latent_dim)
 
     def forward(self, x):
         x1 = F.relu(self.conv1(x))  
@@ -657,7 +656,7 @@ class SkipDecoder8(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 32 * 32 * 128)
+        self.fc = nn.Linear(latent_dim, 16 * 16 * 128)
 
         self.conv3 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(128, 64, kernel_size=3, padding=1)
@@ -666,19 +665,19 @@ class SkipDecoder8(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, x, x1, x2):
-        x = self.fc(x)                       
-        x = x.view(-1, 128, 32, 32) 
-        
+        x = self.fc(x)
+        x = x.view(-1, 128, 16, 16)
+
         x = F.relu(self.conv3(x))
         x = self.upsample(x)
         x = x + x2                        # Skip connection
-        
+
         x = F.relu(self.conv2(x))
-        x = self.upsample(x) 
+        x = self.upsample(x)
         x = x + x1                        # Skip connection
-          
-        x = self.conv1(x) 
-        
+
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder8(nn.Module):
@@ -708,7 +707,7 @@ class SkipEncoder9(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(4 * 4 * 32, latent_dim)
+        self.fc = nn.Linear(2 * 2 * 32, latent_dim)
 
     def forward(self, x):
         x1 = F.relu(self.conv1(x))  
@@ -732,7 +731,7 @@ class SkipDecoder9(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
 
-        self.fc = nn.Linear(latent_dim, 4 * 4 * 32)
+        self.fc = nn.Linear(latent_dim, 2 * 2 * 32)
 
         self.conv6 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
@@ -744,31 +743,31 @@ class SkipDecoder9(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, x, skip1, skip2, skip3, skip4, skip5):
-        x = self.fc(x)                       
-        x = x.view(-1, 32, 4, 4) 
-        
+        x = self.fc(x)
+        x = x.view(-1, 32, 2, 2)
+
         x = F.relu(self.conv6(x))
         x = self.upsample(x)
         x += skip5                        # Skip connection
-        
+
         x = F.relu(self.conv5(x))
         x = self.upsample(x)
         x += skip4                        # Skip connection
-           
+
         x = F.relu(self.conv4(x))
         x = self.upsample(x)
         x += skip3                        # Skip connection
-        
+
         x = F.relu(self.conv3(x))
         x = self.upsample(x)
         x += skip2                        # Skip connection
-        
+
         x = F.relu(self.conv2(x))
         x = self.upsample(x)
         x += skip1                        # Skip connection
-        
-        x = self.conv1(x) 
-        
+
+        x = self.conv1(x)
+
         return x
     
 class SkipAutoencoder9(nn.Module):
