@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.special import softmax
 from collections import Counter
-from sklearn.metrics import accuracy_score, precision_score
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, roc_auc_score
 
 
 # =========================================================
@@ -183,6 +183,9 @@ def run_all_fusions():
 
                         individual_acc = []
                         individual_prec = []
+                        individual_f1 = []
+                        individual_rec = []
+                        individual_auc = []
 
                         for probs, ids in models_outputs:
 
@@ -190,19 +193,35 @@ def run_all_fusions():
                             id2idx = {int(i): idx for idx, i in enumerate(ids.tolist())}
                             rows = [id2idx[int(cid)] for cid in common_ids]
 
-                            preds = np.argmax(probs[rows], axis=1)
+                            probs_aligned = probs[rows]
+                            preds = np.argmax(probs_aligned, axis=1)
                             y_true_ind = np.array([id_to_gt[int(cid)] for cid in common_ids])
 
                             acc = accuracy_score(y_true_ind, preds)
                             prec = precision_score(y_true_ind, preds, average="macro", zero_division=0)
+                            f1 = f1_score(y_true_ind, preds, average="macro", zero_division=0)
+                            rec = recall_score(y_true_ind, preds, average="macro", zero_division=0)
+                            try:
+                                auc = roc_auc_score(y_true_ind, probs_aligned[:, 1])
+                            except ValueError:
+                                auc = float("nan")
 
                             individual_acc.append(acc)
                             individual_prec.append(prec)
+                            individual_f1.append(f1)
+                            individual_rec.append(rec)
+                            individual_auc.append(auc)
 
                         mean_ind_acc = np.mean(individual_acc)
                         std_ind_acc = np.std(individual_acc)
                         mean_ind_prec = np.mean(individual_prec)
                         std_ind_prec = np.std(individual_prec)
+                        mean_ind_f1 = np.nanmean(individual_f1)
+                        std_ind_f1 = np.nanstd(individual_f1)
+                        mean_ind_rec = np.nanmean(individual_rec)
+                        std_ind_rec = np.nanstd(individual_rec)
+                        mean_ind_auc = np.nanmean(individual_auc)
+                        std_ind_auc = np.nanstd(individual_auc)
 
                         # Save baseline
                         baseline_row = {
@@ -215,7 +234,13 @@ def run_all_fusions():
                             "precision": round(mean_ind_prec, 6),
                             "precision_std": round(std_ind_prec, 6),
                             "accuracy": round(mean_ind_acc, 6),
-                            "accuracy_std": round(std_ind_acc, 6)
+                            "accuracy_std": round(std_ind_acc, 6),
+                            "f1": round(mean_ind_f1, 6),
+                            "f1_std": round(std_ind_f1, 6),
+                            "recall": round(mean_ind_rec, 6),
+                            "recall_std": round(std_ind_rec, 6),
+                            "auc": round(mean_ind_auc, 6) if not np.isnan(mean_ind_auc) else "nan",
+                            "auc_std": round(std_ind_auc, 6) if not np.isnan(std_ind_auc) else "nan",
                         }
 
                         save_row(csv_results_path, baseline_row)
@@ -239,6 +264,12 @@ def run_all_fusions():
 
                             acc = accuracy_score(y_true, preds)
                             prec = precision_score(y_true, preds, average="macro", zero_division=0)
+                            f1 = f1_score(y_true, preds, average="macro", zero_division=0)
+                            rec = recall_score(y_true, preds, average="macro", zero_division=0)
+                            try:
+                                auc = roc_auc_score(y_true, fused_probs[:, 1])
+                            except ValueError:
+                                auc = float("nan")
 
                             row = {
                                 "tipo_encoder": type_of_encoder,
@@ -250,7 +281,13 @@ def run_all_fusions():
                                 "precision": round(prec, 6),
                                 "precision_std": 0.0,
                                 "accuracy": round(acc, 6),
-                                "accuracy_std": 0.0
+                                "accuracy_std": 0.0,
+                                "f1": round(f1, 6),
+                                "f1_std": 0.0,
+                                "recall": round(rec, 6),
+                                "recall_std": 0.0,
+                                "auc": round(auc, 6) if not np.isnan(auc) else "nan",
+                                "auc_std": 0.0,
                             }
 
                             save_row(csv_results_path, row)
