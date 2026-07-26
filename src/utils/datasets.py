@@ -11,8 +11,11 @@ class CustomImageDataset(Dataset):
         if data_per_class:
             self.df = pd.concat([self.df[self.df['class'] == 0].head(data_per_class), self.df[self.df['class'] == 1 ].head(data_per_class)])
 
-        self.transform = return_transform() if transform else None
-        self.autoencoder = autoencoder 
+        if isinstance(transform, bool):
+            self.transform = return_transform() if transform else None
+        else:
+            self.transform = transform
+        self.autoencoder = autoencoder
 
     def __len__(self): 
         return len(self.df) 
@@ -22,12 +25,12 @@ class CustomImageDataset(Dataset):
         with Image.open(img_path) as img:
             image = img.convert("RGB")
             
-        label = self.df.iloc[idx, 1] 
+        if self.transform:
+            image = self.transform(image)
 
-        if self.transform: 
-            image = self.transform(image) 
-
-        if self.autoencoder: 
-            label = image 
+        if self.autoencoder:
+            label = image
+        else:
+            label = self.df.iloc[idx, 1]
 
         return np.array(image), label, idx

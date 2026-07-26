@@ -2,7 +2,6 @@ import os
 import csv
 import numpy as np
 import pandas as pd
-from scipy.special import softmax
 from collections import Counter
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, roc_auc_score
 
@@ -11,19 +10,10 @@ from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_sc
 # Load model outputs
 # =========================================================
 
-def load_npz(path):
-    d = np.load(path, allow_pickle=True)
-
-    if 'logits' in d.files:
-        probs = softmax(d['logits'].astype(np.float64), axis=1)
-    elif 'probs' in d.files:
-        probs = d['probs'].astype(np.float32)
-    else:
-        raise ValueError(f"No logits/probs found in {path}")
-
-    ids = d['ids'].astype(np.int64)
-
-    return probs.astype(np.float32), ids
+def load_npy(path):
+    probs = np.load(path).astype(np.float32)
+    ids = np.arange(len(probs), dtype=np.int64)
+    return probs, ids
 
 
 # =========================================================
@@ -32,7 +22,7 @@ def load_npz(path):
 
 def load_ground_truth(dataset_test):
 
-    csv_path = f"/home/lucas.ocunha/ConditionalAutoencoder/CSV/{dataset_test}/{dataset_test}_test.csv"
+    csv_path = f"/home/lucas/representation-fusion/CSV/{dataset_test}/{dataset_test}.csv"
 
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"CSV not found: {csv_path}")
@@ -126,173 +116,178 @@ def fusion_vote(stacked):
 def run_all_fusions():
 
     base_pattern = (
-        "/home/lucas.ocunha/ConditionalAutoencoder/models/"
-        "{type_of_encoder}{encoder}_Classifier/{dataset_train}/encoder_{dataset_encoder}/{batch}/preds/"
-        "{dataset_test}/outputs.npz"
+        "/home/lucas/representation-fusion/Modelos/Modelo_Kyoto-{encoder}/"
+        "Classificador-{dataset_encoder}/Resultados/Treinados_em_{dataset_train}/"
+        "{dataset_test}/batches-{batch}.npy"
     )
 
-    type_of_encoders = ["Encoder", "SkipEncoder"]
-    dataset_encoders = ["CNR", 'PKLot']
-    datasets_train = ["camera1","camera2","camera3","camera4","camera5",
-        "camera6","camera7","camera8","camera9",
-        "PUC","UFPR04","UFPR05"]
-    
-    dataset_tests = [
-        "camera1","camera2","camera3","camera4","camera5",
-        "camera6","camera7","camera8","camera9",
-        "PUC","UFPR04","UFPR05"
-    ]
+    encoder_to_trains = {
+        "CNR":   ["PUC", "UFPR04", "UFPR05"],
+        "PKLot": [
+            "camera1", "camera2", "camera3", "camera4", "camera5",
+            "camera6", "camera7", "camera8", "camera9",
+        ],
+    }
+    encoder_to_tests = {
+        "CNR": [
+            "camera1", "camera2", "camera3", "camera4", "camera5",
+            "camera6", "camera7", "camera8", "camera9",
+            "PUC", "UFPR04", "UFPR05",
+        ],
+        "PKLot": [
+            "camera1", "camera2", "camera3", "camera4", "camera5",
+            "camera6", "camera7", "camera8", "camera9",
+        ],
+    }
     batches = ["64", "128", "256", "512", "1024"]
 
     csv_results_path = "fusion_metrics.csv"
 
-    for type_of_encoder in type_of_encoders:
+    for dataset_encoder, datasets_train in encoder_to_trains.items():
         for dataset_train in datasets_train:
-            for dataset_encoder in dataset_encoders:
-                for batch in batches:
-                    for dataset_test in dataset_tests:
+            for batch in batches:
+                for dataset_test in encoder_to_tests[dataset_encoder]:
 
-                        print(f"\nProcessing {type_of_encoder} | {dataset_train} | {dataset_encoder} | {dataset_test} | batch {batch}")
+                    print(f"\nProcessing {dataset_train} | {dataset_encoder} | {dataset_test} | batch {batch}")
 
-                        models_outputs = []
+                    models_outputs = []
 
-                        for encoder in range(10):
-                            path = base_pattern.format(
-                                type_of_encoder=type_of_encoder,
-                                encoder=encoder,
-                                dataset_train=dataset_train,
-                                dataset_encoder=dataset_encoder,
-                                dataset_test=dataset_test,
-                                batch=batch
-                            )
+                    for encoder in range(10):
+                        path = base_pattern.format(
+                            encoder=encoder,
+                            dataset_encoder=dataset_encoder,
+                            dataset_train=dataset_train,
+                            dataset_test=dataset_test,
+                            batch=batch,
+                        )
 
-                            if os.path.exists(path):
-                                probs, ids = load_npz(path)
-                                models_outputs.append((probs, ids))
+                        if os.path.exists(path):
+                            probs, ids = load_npy(path)
+                            models_outputs.append((probs, ids))
 
-                        if len(models_outputs) == 0:
-                            print("No models found. Skipping.")
-                            continue
+                    if len(models_outputs) == 0:
+                        print("No models found. Skipping.")
+                        continue
 
-                        gt_ids, gt_labels = load_ground_truth(dataset_test)
-                        stacked, y_true, common_ids = align_predictions(models_outputs, gt_ids, gt_labels)
+                    gt_ids, gt_labels = load_ground_truth(dataset_test)
+                    stacked, y_true, common_ids = align_predictions(models_outputs, gt_ids, gt_labels)
 
-                        # =====================================================
-                        # Individual model statistics
-                        # =====================================================
+                    # =====================================================
+                    # Individual model statistics
+                    # =====================================================
 
-                        individual_acc = []
-                        individual_prec = []
-                        individual_f1 = []
-                        individual_rec = []
-                        individual_auc = []
+                    individual_acc = []
+                    individual_prec = []
+                    individual_f1 = []
+                    individual_rec = []
+                    individual_auc = []
 
-                        for probs, ids in models_outputs:
+                    for probs, ids in models_outputs:
 
-                            id_to_gt = {int(i): l for i, l in zip(gt_ids, gt_labels)}
-                            id2idx = {int(i): idx for idx, i in enumerate(ids.tolist())}
-                            rows = [id2idx[int(cid)] for cid in common_ids]
+                        id_to_gt = {int(i): l for i, l in zip(gt_ids, gt_labels)}
+                        id2idx = {int(i): idx for idx, i in enumerate(ids.tolist())}
+                        rows = [id2idx[int(cid)] for cid in common_ids]
 
-                            probs_aligned = probs[rows]
-                            preds = np.argmax(probs_aligned, axis=1)
-                            y_true_ind = np.array([id_to_gt[int(cid)] for cid in common_ids])
+                        probs_aligned = probs[rows]
+                        preds = np.argmax(probs_aligned, axis=1)
+                        y_true_ind = np.array([id_to_gt[int(cid)] for cid in common_ids])
 
-                            acc = accuracy_score(y_true_ind, preds)
-                            prec = precision_score(y_true_ind, preds, average="macro", zero_division=0)
-                            f1 = f1_score(y_true_ind, preds, average="macro", zero_division=0)
-                            rec = recall_score(y_true_ind, preds, average="macro", zero_division=0)
-                            try:
-                                auc = roc_auc_score(y_true_ind, probs_aligned[:, 1])
-                            except ValueError:
-                                auc = float("nan")
+                        acc = accuracy_score(y_true_ind, preds)
+                        prec = precision_score(y_true_ind, preds, average="macro", zero_division=0)
+                        f1 = f1_score(y_true_ind, preds, average="macro", zero_division=0)
+                        rec = recall_score(y_true_ind, preds, average="macro", zero_division=0)
+                        try:
+                            auc = roc_auc_score(y_true_ind, probs_aligned[:, 1])
+                        except ValueError:
+                            auc = float("nan")
 
-                            individual_acc.append(acc)
-                            individual_prec.append(prec)
-                            individual_f1.append(f1)
-                            individual_rec.append(rec)
-                            individual_auc.append(auc)
+                        individual_acc.append(acc)
+                        individual_prec.append(prec)
+                        individual_f1.append(f1)
+                        individual_rec.append(rec)
+                        individual_auc.append(auc)
 
-                        mean_ind_acc = np.mean(individual_acc)
-                        std_ind_acc = np.std(individual_acc)
-                        mean_ind_prec = np.mean(individual_prec)
-                        std_ind_prec = np.std(individual_prec)
-                        mean_ind_f1 = np.nanmean(individual_f1)
-                        std_ind_f1 = np.nanstd(individual_f1)
-                        mean_ind_rec = np.nanmean(individual_rec)
-                        std_ind_rec = np.nanstd(individual_rec)
-                        mean_ind_auc = np.nanmean(individual_auc)
-                        std_ind_auc = np.nanstd(individual_auc)
+                    mean_ind_acc = np.mean(individual_acc)
+                    std_ind_acc = np.std(individual_acc)
+                    mean_ind_prec = np.mean(individual_prec)
+                    std_ind_prec = np.std(individual_prec)
+                    mean_ind_f1 = np.nanmean(individual_f1)
+                    std_ind_f1 = np.nanstd(individual_f1)
+                    mean_ind_rec = np.nanmean(individual_rec)
+                    std_ind_rec = np.nanstd(individual_rec)
+                    mean_ind_auc = np.nanmean(individual_auc)
+                    std_ind_auc = np.nanstd(individual_auc)
 
-                        # Save baseline
-                        baseline_row = {
-                            "tipo_encoder": type_of_encoder,
+                    # Save baseline
+                    baseline_row = {
+                        "tipo_encoder": "Modelo_Kyoto",
+                        "dataset_encoder": dataset_encoder,
+                        "dataset_train": dataset_train,
+                        "dataset_test": dataset_test,
+                        "batch": batch,
+                        "tecnica_fusao": "mean_individual_models",
+                        "precision": round(mean_ind_prec, 6),
+                        "precision_std": round(std_ind_prec, 6),
+                        "accuracy": round(mean_ind_acc, 6),
+                        "accuracy_std": round(std_ind_acc, 6),
+                        "f1": round(mean_ind_f1, 6),
+                        "f1_std": round(std_ind_f1, 6),
+                        "recall": round(mean_ind_rec, 6),
+                        "recall_std": round(std_ind_rec, 6),
+                        "auc": round(mean_ind_auc, 6) if not np.isnan(mean_ind_auc) else "nan",
+                        "auc_std": round(std_ind_auc, 6) if not np.isnan(std_ind_auc) else "nan",
+                    }
+
+                    save_row(csv_results_path, baseline_row)
+
+                    # =====================================================
+                    # Fusion methods
+                    # =====================================================
+
+                    fusion_methods = {
+                        "sum": fusion_sum,
+                        "mean_probs": fusion_mean,
+                        "max": fusion_max,
+                        "mult": fusion_mult,
+                        "vote": fusion_vote,
+                    }
+
+                    for name, func in fusion_methods.items():
+
+                        fused_probs = func(stacked)
+                        preds = np.argmax(fused_probs, axis=1)
+
+                        acc = accuracy_score(y_true, preds)
+                        prec = precision_score(y_true, preds, average="macro", zero_division=0)
+                        f1 = f1_score(y_true, preds, average="macro", zero_division=0)
+                        rec = recall_score(y_true, preds, average="macro", zero_division=0)
+                        try:
+                            auc = roc_auc_score(y_true, fused_probs[:, 1])
+                        except ValueError:
+                            auc = float("nan")
+
+                        row = {
+                            "tipo_encoder": "Modelo_Kyoto",
                             "dataset_encoder": dataset_encoder,
                             "dataset_train": dataset_train,
                             "dataset_test": dataset_test,
                             "batch": batch,
-                            "tecnica_fusao": "mean_individual_models",
-                            "precision": round(mean_ind_prec, 6),
-                            "precision_std": round(std_ind_prec, 6),
-                            "accuracy": round(mean_ind_acc, 6),
-                            "accuracy_std": round(std_ind_acc, 6),
-                            "f1": round(mean_ind_f1, 6),
-                            "f1_std": round(std_ind_f1, 6),
-                            "recall": round(mean_ind_rec, 6),
-                            "recall_std": round(std_ind_rec, 6),
-                            "auc": round(mean_ind_auc, 6) if not np.isnan(mean_ind_auc) else "nan",
-                            "auc_std": round(std_ind_auc, 6) if not np.isnan(std_ind_auc) else "nan",
+                            "tecnica_fusao": name,
+                            "precision": round(prec, 6),
+                            "precision_std": 0.0,
+                            "accuracy": round(acc, 6),
+                            "accuracy_std": 0.0,
+                            "f1": round(f1, 6),
+                            "f1_std": 0.0,
+                            "recall": round(rec, 6),
+                            "recall_std": 0.0,
+                            "auc": round(auc, 6) if not np.isnan(auc) else "nan",
+                            "auc_std": 0.0,
                         }
 
-                        save_row(csv_results_path, baseline_row)
+                        save_row(csv_results_path, row)
 
-                        # =====================================================
-                        # Fusion methods
-                        # =====================================================
-
-                        fusion_methods = {
-                            "sum": fusion_sum,
-                            "mean_probs": fusion_mean,
-                            "max": fusion_max,
-                            "mult": fusion_mult,
-                            "vote": fusion_vote
-                        }
-
-                        for name, func in fusion_methods.items():
-
-                            fused_probs = func(stacked)
-                            preds = np.argmax(fused_probs, axis=1)
-
-                            acc = accuracy_score(y_true, preds)
-                            prec = precision_score(y_true, preds, average="macro", zero_division=0)
-                            f1 = f1_score(y_true, preds, average="macro", zero_division=0)
-                            rec = recall_score(y_true, preds, average="macro", zero_division=0)
-                            try:
-                                auc = roc_auc_score(y_true, fused_probs[:, 1])
-                            except ValueError:
-                                auc = float("nan")
-
-                            row = {
-                                "tipo_encoder": type_of_encoder,
-                                "dataset_train": dataset_train,
-                                "dataset_encoder": dataset_encoder,
-                                "dataset_test": dataset_test,
-                                "batch": batch,
-                                "tecnica_fusao": name,
-                                "precision": round(prec, 6),
-                                "precision_std": 0.0,
-                                "accuracy": round(acc, 6),
-                                "accuracy_std": 0.0,
-                                "f1": round(f1, 6),
-                                "f1_std": 0.0,
-                                "recall": round(rec, 6),
-                                "recall_std": 0.0,
-                                "auc": round(auc, 6) if not np.isnan(auc) else "nan",
-                                "auc_std": 0.0,
-                            }
-
-                            save_row(csv_results_path, row)
-
-                        print("Saved metrics.")
+                    print("Saved metrics.")
 
 
 # =========================================================

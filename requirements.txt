@@ -10,8 +10,8 @@ attrs==25.4.0
 babel==2.17.0
 beautifulsoup4==4.14.2
 bleach==6.2.0
-brotlicffi @ file:///home/task_176496125431831/conda-bld/brotlicffi_1764961387175/work
-certifi @ file:///home/task_176765898807400/croot/certifi_1767659142395/work/certifi
+brotlicffi 
+certifi
 cffi==2.0.0
 charset-normalizer==3.4.4
 comm==0.2.3
