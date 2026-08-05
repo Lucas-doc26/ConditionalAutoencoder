@@ -1,0 +1,33 @@
+\babel@toc {brazil}{}\relax 
+\contentsline {section}{\numberline {1}INTRODUÇÃO}{5}{}%
+\contentsline {section}{\numberline {2}OBJETIVO}{5}{}%
+\contentsline {section}{\numberline {3}MATERIAIS E MÉTODOS}{6}{}%
+\contentsline {subsection}{\numberline {3.1}\textit {Convolutional Autoencoder} (CAE)}{6}{}%
+\contentsline {subsection}{\numberline {3.2}Variational Autoencoder (VAE)}{6}{}%
+\contentsline {subsection}{\numberline {3.3}Métricas de Avaliação de Reconstrução de Imagens}{7}{}%
+\contentsline {subsection}{\numberline {3.4}Classificadores}{7}{}%
+\contentsline {subsection}{\numberline {3.5}Estratégias de Fusão de Representações}{8}{}%
+\contentsline {subsection}{\numberline {3.6}Conjunto de Dados}{8}{}%
+\contentsline {subsubsection}{\numberline {3.6.1}PKLot}{9}{}%
+\contentsline {subsubsection}{\numberline {3.6.2}CNR-EXT}{9}{}%
+\contentsline {subsection}{\numberline {3.7}Pré-processamento}{9}{}%
+\contentsline {subsection}{\numberline {3.8}Técnicas de Interpretabilidade}{10}{}%
+\contentsline {subsubsection}{\numberline {3.8.1}Análise por Heatmap}{10}{}%
+\contentsline {subsection}{\numberline {3.9}Protocolo Experimental}{10}{}%
+\contentsline {subsubsection}{\numberline {3.9.1}Treinamento dos Autoencoders}{11}{}%
+\contentsline {subsubsection}{\numberline {3.9.2}Treinamento dos Classificadores}{12}{}%
+\contentsline {section}{\numberline {4}RESULTADOS}{13}{}%
+\contentsline {subsection}{\numberline {4.1}Aprendizado não supervisionado}{13}{}%
+\contentsline {subsubsection}{\numberline {4.1.1}Qualidade de Reconstrução dos Autoencoders}{13}{}%
+\contentsline {subsection}{\numberline {4.2}Aprendizado Supervisionado de Tarefas}{14}{}%
+\contentsline {subsubsection}{\numberline {4.2.1}Análise Comparativa entre Arquiteturas de Autoencoder}{14}{}%
+\contentsline {subsubsection}{\numberline {4.2.2}Fusões}{15}{}%
+\contentsline {subsubsection}{\numberline {4.2.3}Resultados no Mesmo Domínio}{15}{}%
+\contentsline {subsection}{\numberline {4.3}Resultados contra diferentes domínios}{16}{}%
+\contentsline {subsection}{\numberline {4.4}Comparação com Métodos de Estado da Arte}{18}{}%
+\contentsline {subsection}{\numberline {4.5}Interpretabilidade}{18}{}%
+\contentsline {subsubsection}{\numberline {4.5.1}Análise por Heatmap}{18}{}%
+\contentsline {section}{\numberline {5}DISCUSSÃO}{19}{}%
+\contentsline {section}{\numberline {6}CONCLUSÃO}{20}{}%
+\contentsline {section}{\numberline {7}RELATO DE EXPERIÊNCIA}{20}{}%
+\contentsline {section}{\numberline {8}USO DE INTELIGÊNCIA ARTIFICIAL GENERATIVA}{21}{}%

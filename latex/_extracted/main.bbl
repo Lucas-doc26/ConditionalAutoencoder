@@ -1,0 +1,64 @@
+\begin{thebibliography}{10}
+
+\bibitem{bhattacharya2022review}
+S.~Bhattacharya, S.~R.~K. Somayaji, T.~R. Gadekallu, M.~Alazab, and P.~K.~R. Maddikunta, ``A review on deep learning for future smart cities,'' {\em Internet Technology Letters}, vol.~5, no.~1, p.~e187, 2022.
+
+\bibitem{Almeida2022}
+P.~Almeida, J.~Alves, R.~Parpinelli, and J.~Barddal, ``A systematic review on computer vision-based parking lot management applied on public datasets,'' {\em Expert Systems With Applications}, vol.~198, p.~116731, 2022.
+
+\bibitem{Almeida2023Vehicle}
+P.~R.~L. de~Almeida, J.~H. Alves, L.~S. Oliveira, A.~G. Hochuli, J.~V. Fröhlich, and R.~A. Krauel, ``Vehicle occurrence-based parking space detection,'' in {\em 2023 IEEE International Conference on Systems, Man, and Cybernetics (SMC)}, pp.~1524--1529, 2023.
+
+\bibitem{hochuli2023}
+A.~G. Hochuli, J.~P. Barddal, {\em et~al.}, ``Deep single models vs. ensembles: Insights for a fast deployment of parking monitoring systems,'' in {\em 2023 ICMLA}, pp.~1379--1384, 2023.
+
+\bibitem{Luza2025PKLOTDISTILLING}
+P.~L. Alves, A.~Hochuli, L.~E. de~Oliveira, and P.~L. de~Almeida, ``Optimizing parking space classification: Distilling ensembles into lightweight classifiers,'' in {\em 2024 International Conference on Machine Learning and Applications (ICMLA)}, pp.~1016--1020, 2024.
+
+\bibitem{hochuli2022}
+A.~G. Hochuli, A.~S. Britto, P.~R. Almeida, Alves, {\em et~al.}, ``Evaluation of different annotation strategies for deployment of parking spaces classification systems,'' in {\em 2022 IJCNN}, pp.~1--8, IEEE, 2022.
+
+\bibitem{Raina2007SelfTaught}
+R.~Raina, A.~Battle, H.~Lee, B.~Packer, and A.~Y. Ng, ``Self-taught learning: Transfer learning from unlabeled data,'' in {\em Proceedings of the 24th International Conference on Machine Learning (ICML)}, pp.~759--766, 2007.
+
+\bibitem{Delazeri2025Representation}
+B.~R. Delazeri, A.~G. Hochuli, J.~P. Barddal, A.~L. Koerich, and A.~d.~S. Britto, ``Representation ensemble learning applied to facial expression recognition,'' {\em Neural Computing and Applications}, vol.~37, pp.~417--438, Jan 2025.
+
+\bibitem{zhang2023STL}
+M.~Zhang, H.~Liu, M.~Gong, H.~Li, Y.~Wu, and X.~Jiang, ``Cross-domain self-taught network for few-shot hyperspectral image classification,'' {\em IEEE Transactions on Geoscience and Remote Sensing}, vol.~61, pp.~1--19, 2023.
+
+\bibitem{vaiyapuri2024STL}
+T.~Vaiyapuri and A.~Binbusayyis, ``Deep self-taught learning framework for intrusion detection in cloud computing environment,'' {\em IAES Int. J. Artif. Intell.(IJ-AI)}, vol.~13, no.~1, p.~747, 2024.
+
+\bibitem{germani2023STL}
+E.~Germani, E.~Fromont, and C.~Maumet, ``On the benefits of self-taught learning for brain decoding,'' {\em GigaScience}, vol.~12, p.~giad029, 2023.
+
+\bibitem{AutoencoderFigure}
+X.~Guo, X.~Liu, E.~Zhu, and J.~Yin, ``Deep clustering with convolutional autoencoders,'' pp.~373--382, 10 2017.
+
+\bibitem{VAE}
+D.~P. Kingma and M.~Welling, ``Auto-encoding variational bayes,'' 2022.
+
+\bibitem{deeplearningbook2025vae}
+P.~A.~F. Galvão and L.~A.~A. Meira, ``Variational autoencoders (vaes): definição, redução de dimensionalidade, espaço latente e regularização,'' 2025.
+\newblock Acesso em: 25 fev. 2026.
+
+\bibitem{almeidaEtAl2015}
+P.~R. Almeida, L.~S. Oliveira, A.~S. Britto~Jr, E.~J. Silva~Jr, and A.~L. Koerich, ``Pklot--a robust dataset for parking lot classification,'' {\em Expert Systems with Applications}, vol.~42, no.~11, pp.~4937--4949, 2015.
+
+\bibitem{amatoEtAl2017}
+G.~Amato, F.~Carrara, F.~Falchi, C.~Gennaro, C.~Meghini, and C.~Vairo, ``Deep learning for decentralized parking lot occupancy detection,'' {\em Expert Systems with Applications}, vol.~72, pp.~327--334, 2017.
+
+\bibitem{albumentations}
+A.~Buslaev, V.~I. Iglovikov, E.~Khvedchenya, A.~Parinov, M.~Druzhinin, and A.~A. Kalinin, ``Albumentations: Fast and flexible image augmentations,'' {\em Information}, vol.~11, no.~2, 2020.
+
+\bibitem{Selvaraju2017GradCAM}
+R.~R. Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh, and D.~Batra, ``Grad-cam: Visual explanations from deep networks via gradient-based localization,'' in {\em Proceedings of the IEEE International Conference on Computer Vision (ICCV)}, pp.~618--626, 2017.
+
+\bibitem{SantosPKLOTGAN}
+A.~M.~F. dos Santos, P.~R.~L. de~Almeida, J.~P. Barddal, and A.~G. Hochuli, ``A generative domain adaptation scheme for swift deployment of parking monitoring systems,'' in {\em Intelligent Systems} (R.~de~Freitas and D.~Furtado, eds.), (Cham), pp.~34--49, Springer Nature Switzerland, 2026.
+
+\bibitem{nurullayevLee2019}
+S.~Nurullayev and S.-W. Lee, ``Generalized parking occupancy analysis based on dilated convolutional neural network,'' {\em Sensors}, vol.~19, no.~2, p.~277, 2019.
+
+\end{thebibliography}

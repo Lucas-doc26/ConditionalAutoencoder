@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+The style file: ieeetr.bst
+Database file #1: refs.bib
+Warning--entry type for "deeplearningbook2025vae" isn't style-file defined
+--line 540 of file refs.bib
+Warning--empty journal in AutoencoderFigure
+You've used 20 entries,
+            1876 wiz_defined-function locations,
+            615 strings with 8174 characters,
+and the built_in function-call counts, 6397 in all, are:
+= -- 602
+> -- 303
+< -- 0
++ -- 107
+- -- 87
+* -- 456
+:= -- 890
+add.period$ -- 21
+call.type$ -- 20
+change.case$ -- 20
+chr.to.int$ -- 0
+cite$ -- 21
+duplicate$ -- 336
+empty$ -- 571
+format.name$ -- 87
+if$ -- 1570
+int.to.chr$ -- 0
+int.to.str$ -- 20
+missing$ -- 18
+newline$ -- 64
+num.names$ -- 22
+pop$ -- 84
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 259
+stack$ -- 0
+substring$ -- 405
+swap$ -- 157
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 1
+while$ -- 57
+width$ -- 22
+write$ -- 196
+(There were 2 warnings)
